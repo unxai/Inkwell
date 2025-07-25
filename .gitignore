@@ -38,10 +38,3 @@ pnpm-debug.log*
 # 操作系统文件
 .DS_Store
 Thumbs.db
-
-# 测试覆盖率
-/coverage
-.nyc_output
-
-# 本地配置文件
-*.local
