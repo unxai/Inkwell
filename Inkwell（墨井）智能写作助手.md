@@ -1,0 +1,62 @@
+# Inkwell（墨井）智能写作助手
+
+## Core Features
+
+- 智能文本补全
+
+- 结构化写作工具
+
+- 文本优化套件
+
+- 专业富文本编辑器
+
+## Tech Stack
+
+{
+  "Web": {
+    "arch": "vue",
+    "component": null
+  },
+  "Backend": "FastAPI",
+  "Editor": "Tiptap",
+  "AI": "OpenAI API",
+  "Communication": "WebSocket + Streaming"
+}
+
+## Design
+
+极简主义设计风格，白色(#FFFFFF)为主色调，深墨蓝(#1A365D)为强调色，浅青色(#4FD1C5)为交互元素色彩。界面包含顶部导航栏、侧边功能面板、主编辑区域和AI补全交互区，强调清晰的信息层次和流畅的写作体验。
+
+## Plan
+
+Note: 
+
+- [ ] is holding
+- [/] is doing
+- [X] is done
+
+---
+
+[X] 设置项目基础架构
+
+[X] 实现Tiptap富文本编辑器基础功能
+
+[X] 开发WebSocket连接和流式响应处理
+
+[X] 实现OpenAI API集成和上下文窗口管理
+
+[X] 开发自动完成功能和UI交互
+
+[X] 实现文章大纲生成功能
+
+[X] 开发学术论文结构生成器
+
+[X] 实现引用管理系统
+
+[X] 开发文本优化功能（改写/扩写/简化）
+
+[X] 实现写作风格调整功能
+
+[X] 优化UI界面和用户体验
+
+[X] 进行系统测试和性能优化
