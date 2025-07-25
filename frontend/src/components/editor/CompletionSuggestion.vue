@@ -13,18 +13,14 @@
         title="接受建议 (Tab)"
         @click="handleAccept"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-        </svg>
+        Accept →
       </button>
       <button 
         class="action-button reject" 
         title="拒绝建议 (Esc)"
         @click="handleReject"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-        </svg>
+        Try Again
       </button>
     </div>
   </div>
@@ -64,57 +60,70 @@ const handleReject = () => {
   position: absolute;
   z-index: 10;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   max-width: 80%;
 }
 
 .suggestion-content {
-  background-color: rgba(79, 209, 197, 0.1);
+  background-color: rgba(255, 255, 255, 0.98);
   border: 1px solid rgba(79, 209, 197, 0.3);
-  border-radius: 4px;
-  padding: 2px 6px;
+  border-radius: 3px;
+  padding: 6px 10px;
   color: #666;
   font-style: italic;
+  max-width: 100%;
+  word-break: break-word;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .suggestion-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+  color: rgba(100, 100, 100, 0.8);
 }
 
 .suggestion-actions {
   display: flex;
-  margin-left: 4px;
+  align-items: center;
+  margin-top: 6px;
+  gap: 6px;
 }
 
 .action-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  margin-left: 2px;
+  padding: 3px 10px;
+  border-radius: 3px;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 12px;
 }
 
 .action-button.accept {
-  background-color: rgba(79, 209, 197, 0.2);
-  color: #1A365D;
+  background-color: #4FD1C5;
+  color: white;
+  border: none;
 }
 
 .action-button.accept:hover {
-  background-color: rgba(79, 209, 197, 0.4);
+  background-color: #3DB9B0;
 }
 
 .action-button.reject {
-  background-color: rgba(229, 62, 62, 0.1);
-  color: #822727;
+  background-color: transparent;
+  color: #333;
+  border: none;
 }
 
 .action-button.reject:hover {
-  background-color: rgba(229, 62, 62, 0.2);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.keyboard-shortcut {
+  font-size: 11px;
+  color: #666;
+  padding: 2px 5px;
+  border: 1px solid #eee;
+  border-radius: 3px;
 }
 </style>

@@ -1,11 +1,11 @@
 <template>
-  <div class="text-editor">
+  <div class="text-editor h-full">
     <!-- 编辑器工具栏 -->
     <editor-toolbar :editor="editor" v-if="editor" />
     
     <!-- 编辑器内容区 -->
-    <div class="editor-content-wrapper relative" ref="editorContainer">
-      <editor-content :editor="editor" class="editor-content prose max-w-none" />
+    <div class="editor-content-wrapper relative h-full paper-effect" ref="editorContainer">
+      <editor-content :editor="editor" class="editor-content prose max-w-none h-full" />
       
       <!-- AI补全建议 -->
       <completion-suggestion
@@ -110,6 +110,10 @@ const completionSuggestion = ref('')
 const showSuggestion = ref(false)
 const suggestionPosition = ref({ top: 0, left: 0 })
 const currentCursorPosition = ref(0)
+const typingTimer = ref(null) // 用户输入定时器
+const typingDelay = 1000 // 用户停止输入后等待时间(毫秒)
+const lastCompletionTime = ref(0) // 上次请求补全的时间
+const completionCooldown = 3000 // 补全请求冷却时间(毫秒)
 
 // 格式化时间
 const formatTime = (seconds) => {
@@ -161,6 +165,19 @@ const editor = useEditor({
     if (editor.state.selection) {
       currentCursorPosition.value = editor.state.selection.from
       editorStore.updateCursorPosition(currentCursorPosition.value)
+    }
+    
+    // 如果启用了自动完成，设置定时器
+    if (props.autoCompleteEnabled) {
+      // 清除之前的定时器
+      if (typingTimer.value) {
+        clearTimeout(typingTimer.value)
+      }
+      
+      // 设置新的定时器，用户停止输入后触发
+      typingTimer.value = setTimeout(() => {
+        triggerAutoCompletion()
+      }, typingDelay)
     }
   },
   onSelectionUpdate: ({ editor }) => {
@@ -253,6 +270,37 @@ const rejectSuggestion = () => {
   emit('completion-rejected')
 }
 
+// 触发自动完成
+const triggerAutoCompletion = () => {
+  if (!editor.value || aiStatus.value === 'processing') return
+  
+  const now = Date.now()
+  // 检查是否在冷却期内
+  if (now - lastCompletionTime.value < completionCooldown) {
+    return
+  }
+  
+  const { state } = editor.value
+  const { from } = state.selection
+  const text = editor.value.getText()
+  
+  // 获取光标前后的上下文
+  const contextBefore = text.slice(0, from)
+  const contextAfter = text.slice(from)
+  
+  // 如果上下文为空，不触发补全
+  if (!contextBefore.trim()) return
+  
+  // 更新上次请求时间
+  lastCompletionTime.value = now
+  
+  // 设置AI状态为处理中
+  editorStore.updateAiStatus('processing')
+  
+  // 请求补全
+  editorStore.getCompletion(contextBefore, contextBefore, contextAfter, from)
+}
+
 // 处理键盘事件
 const handleKeyDown = (event) => {
   // 如果有建议显示
@@ -290,6 +338,12 @@ onBeforeUnmount(() => {
     editingTimer = null
   }
   
+  // 清除输入定时器
+  if (typingTimer.value) {
+    clearTimeout(typingTimer.value)
+    typingTimer.value = null
+  }
+  
   // 销毁编辑器
   if (editor.value) {
     editor.value.destroy()
@@ -310,56 +364,83 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .editor-content-wrapper {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 1rem 1rem; /* 减少内边距，让内容区域更大 */
+  background-color: #f9f9f9;
+  height: calc(100vh - 180px); /* 调整编辑器高度，确保不会太高 */
+}
+
+.paper-effect {
   background-color: white;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+  border-radius: 2px;
+  max-width: 95%; /* 将编辑器宽度设置为95% */
+  margin: 0 auto;
+  padding: 40px 60px;
+  position: relative;
+  min-height: calc(100% - 40px);
+}
+
+.paper-effect::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, rgba(79, 209, 197, 0.3), transparent);
 }
 
 .editor-content {
-  min-height: 500px;
+  height: 100%;
   outline: none;
 }
 
 /* Tiptap编辑器样式 */
 .ProseMirror {
-  min-height: 500px;
+  height: 100%;
   outline: none;
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.8;
   color: #333;
+  font-family: 'Noto Serif SC', serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  letter-spacing: 0.02em;
+  min-height: 400px; /* 调整编辑器的最小高度 */
 }
 
 .ProseMirror p {
-  margin-bottom: 1em;
+  margin-bottom: 1.2em;
+  text-align: justify;
 }
 
 .ProseMirror h1 {
-  font-size: 1.75rem;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-top: 1.8rem;
+  margin-bottom: 1.2rem;
+  color: #1A365D;
+  border-bottom: 1px solid #eaeaea;
+  padding-bottom: 0.3rem;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
   font-weight: 600;
   margin-top: 1.5rem;
   margin-bottom: 1rem;
   color: #1A365D;
 }
 
-.ProseMirror h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-top: 1.25rem;
-  margin-bottom: 0.75rem;
-  color: #1A365D;
-}
-
 .ProseMirror h3 {
   font-size: 1.25rem;
   font-weight: 600;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
+  margin-top: 1.2rem;
+  margin-bottom: 0.8rem;
   color: #1A365D;
 }
 
@@ -381,19 +462,22 @@ defineExpose({
 
 .ProseMirror blockquote {
   border-left: 3px solid #4FD1C5;
-  padding-left: 1rem;
+  padding: 0.5rem 1rem;
   color: #4A5568;
-  margin: 1rem 0;
+  margin: 1.5rem 0;
   font-style: italic;
+  background-color: rgba(79, 209, 197, 0.05);
+  border-radius: 0 4px 4px 0;
 }
 
 .ProseMirror pre {
   background-color: #F7FAFC;
-  padding: 0.75rem;
+  padding: 1rem;
   border-radius: 0.25rem;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  margin: 1rem 0;
+  margin: 1.5rem 0;
   overflow-x: auto;
+  border: 1px solid #edf2f7;
 }
 
 .ProseMirror code {

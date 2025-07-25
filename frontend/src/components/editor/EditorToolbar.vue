@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-toolbar bg-white border-b border-gray-200 p-2 flex flex-wrap items-center gap-1">
+  <div class="editor-toolbar bg-white border-b border-gray-200 p-1.5 flex flex-wrap items-center gap-1 justify-center">
     <!-- 文本格式化工具 -->
     <button
       @click="editor.chain().focus().toggleBold().run()"

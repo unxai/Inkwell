@@ -121,37 +121,6 @@ async def generate_completion(request: CompletionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def stream_completion(request: CompletionRequest):
-    """
-    流式生成文本补全
-    使用OpenAI API的流式响应
-    """
-    try:
-        # 使用OpenAI API生成文本补全
-        async for chunk in OpenAIService.generate_completion(
-            text=request.text,
-            context_before=request.context_before,
-            context_after=request.context_after,
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-            stream=True
-        ):
-            # 将API响应转换为SSE格式
-            yield f"data: {json.dumps(chunk)}\n\n"
-    except Exception as e:
-        # 发送错误消息
-        yield f"data: {json.dumps({'type': 'error', 'error': str(e), 'status': 'error'})}\n\n"
-        print(f"流式生成文本补全时出错: {str(e)}")
-
-@router.post("/stream")
-async def stream_completion_endpoint(request: CompletionRequest):
-    """
-    提供Server-Sent Events (SSE)方式的流式文本补全
-    """
-    return StreamingResponse(
-        stream_completion(request),
-        media_type="text/event-stream"
-    )
 
 @router.post("/optimize")
 async def optimize_text(request: CompletionRequest):

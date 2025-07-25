@@ -1,13 +1,16 @@
 import os
-from typing import List, Optional
-from pydantic import validator
-from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
+from typing import List
 
-# 加载.env文件
-load_dotenv()
+from pydantic import validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_ignore_empty=True, extra="ignore"
+    )
+
     # API配置
     API_V1_STR: str = "/api/v1"
     

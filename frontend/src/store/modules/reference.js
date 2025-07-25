@@ -8,36 +8,14 @@ export const useReferenceStore = defineStore('reference', {
   }),
   
   actions: {
-    async formatReference(reference) {
-      try {
-        const response = await axios.post('/api/v1/reference/format', {
-          ...reference,
-          style: this.selectedStyle
-        })
-        
-        return response.data.formatted_citation
-      } catch (error) {
-        console.error('格式化引用失败:', error)
-        throw error
+    addReference(reference) {
+      const newReference = {
+        ...reference,
+        id: Date.now().toString()
       }
-    },
-    
-    async addReference(reference) {
-      try {
-        const formattedCitation = await this.formatReference(reference)
-        
-        const newReference = {
-          ...reference,
-          formattedCitation,
-          id: Date.now().toString()
-        }
-        
-        this.references.push(newReference)
-        return newReference
-      } catch (error) {
-        console.error('添加引用失败:', error)
-        throw error
-      }
+      
+      this.references.push(newReference)
+      return newReference
     },
     
     removeReference(id) {

@@ -84,24 +84,3 @@ class ContextWindowManager:
         
         return int(tokens)
     
-    def slide_window(self, text: str, cursor_position: int, direction: str = "forward", step: int = 100) -> int:
-        """
-        滑动上下文窗口
-        
-        参数:
-        - text: 完整文本
-        - cursor_position: 当前光标位置
-        - direction: 滑动方向，"forward"向前，"backward"向后
-        - step: 滑动步长（字符数）
-        
-        返回:
-        - 新的光标位置
-        """
-        if direction == "forward":
-            # 向前滑动，光标位置增加
-            new_position = min(cursor_position + step, len(text))
-        else:
-            # 向后滑动，光标位置减少
-            new_position = max(cursor_position - step, 0)
-        
-        return new_position
