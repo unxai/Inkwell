@@ -16,12 +16,17 @@ class CompletionResponse(BaseModel):
     """文本补全响应模型"""
     completion: str = Field(..., description="生成的补全文本")
     status: str = Field(..., description="处理状态")
+    request_id: Optional[str] = Field(None, description="请求ID，用于日志追踪")
+    action: Optional[str] = Field(None, description="操作类型，可选值为 completion(补全), rewrite(改写), expand(扩写), simplify(简化)")
 
 class StreamToken(BaseModel):
     """流式响应中的单个令牌"""
-    type: Literal["start", "token", "end", "error"] = Field(..., description="令牌类型")
+    type: Literal["start", "token", "end", "error", "system"] = Field(..., description="令牌类型")
     token: Optional[str] = Field(None, description="令牌内容")
     completion: Optional[str] = Field(None, description="完整的补全文本，仅在type=end时提供")
     action: Optional[str] = Field("completion", description="操作类型，可选值为 completion(补全), rewrite(改写), expand(扩写), simplify(简化)")
     status: str = Field(..., description="处理状态")
     error: Optional[str] = Field(None, description="错误信息，仅在type=error时提供")
+    request_id: Optional[str] = Field(None, description="请求ID，用于日志追踪")
+    message: Optional[str] = Field(None, description="系统消息，仅在type=system时提供")
+    retry_after: Optional[int] = Field(None, description="需要等待的秒数，仅在速率限制时提供")

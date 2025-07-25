@@ -4,7 +4,7 @@
     <editor-toolbar :editor="editor" v-if="editor" />
     
     <!-- 编辑器内容区 -->
-    <div class="editor-content-wrapper relative h-full paper-effect" ref="editorContainer">
+    <div class="editor-content-wrapper relative h-full w-full paper-effect" ref="editorContainer">
       <editor-content :editor="editor" class="editor-content prose max-w-none h-full" />
       
       <!-- AI补全建议 -->
