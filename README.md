@@ -19,4 +19,3 @@ Inkwell（墨井）是一个简化版智能写作助手
 - **后端**：FastAPI
 - **编辑器**：Tiptap
 - **AI**：OpenAI API
-- **通信**：WebSocket + Streaming
