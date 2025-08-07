@@ -10,7 +10,8 @@ class CompletionRequest(BaseModel):
     max_tokens: int = Field(50, description="生成的最大token数量")
     temperature: float = Field(0.7, description="生成文本的创造性程度，值越高创造性越强")
     stream: bool = Field(False, description="是否使用流式响应")
-    action: str = Field("completion", description="操作类型，可选值为 completion(补全), rewrite(改写), expand(扩写), simplify(简化)")
+    action: str = Field("completion", description="操作类型，可选值为 completion(补全), rewrite(改写), expand(扩写), simplify(简化), translate(翻译)")
+    target_language: Optional[str] = Field(None, description="目标语言代码，仅用于翻译操作，如 'zh', 'en', 'ja' 等")
 
 class CompletionResponse(BaseModel):
     """文本补全响应模型"""

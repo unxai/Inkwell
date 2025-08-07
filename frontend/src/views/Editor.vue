@@ -5,18 +5,7 @@
       <div class="flex items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
           <h1 class="text-xl font-semibold text-[#1A365D]">墨井</h1>
-          <div class="flex items-center">
-            <span 
-              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-              :class="isConnected.value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-            >
-              <span 
-                class="w-2 h-2 mr-1 rounded-full"
-                :class="isConnected.value ? 'bg-green-400' : 'bg-red-400'"
-              ></span>
-              {{ isConnected.value ? 'AI 已连接' : 'AI 未连接' }}
-            </span>
-          </div>
+          
         </div>
         
         <div class="flex items-center">
@@ -187,7 +176,7 @@
           <text-editor
             ref="textEditorRef"
             :initial-content="editorContent"
-            :auto-complete-enabled="false"
+            :auto-complete-enabled="true"
             :is-connected="isConnected.value"
             :references="references"
             @update:content="handleContentUpdate"
@@ -305,6 +294,48 @@
           </div>
         </div>
       </div>
+      
+      <!-- 翻译语言选择弹层 -->
+      <div 
+        v-if="showTranslateOptions" 
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        @click="cancelTranslate"
+      >
+        <div 
+          class="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative"
+          @click.stop
+        >
+          <h3 class="text-lg font-semibold mb-4">🌐 选择翻译目标语言</h3>
+          <div class="space-y-2 max-h-80 overflow-y-auto">
+            <button
+              v-for="language in translateLanguages"
+              :key="language.code"
+              @click="selectTranslateLanguage(language.code)"
+              class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between"
+              :class="{ 'bg-blue-50 border border-blue-200': translateTargetLanguage === language.code }"
+            >
+              <span>{{ language.name }}</span>
+              <svg 
+                v-if="translateTargetLanguage === language.code"
+                class="w-5 h-5 text-blue-500" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="flex space-x-3 mt-6">
+            <button 
+              @click="cancelTranslate"
+              class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -312,7 +343,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useEditorStore } from '@/store/modules/editor'
-import { useCompletion } from '@/composables/useCompletion'
 import TextEditor from '@/components/editor/TextEditor.vue'
 import AiChatPanel from '@/components/editor/AiChatPanel.vue'
 import TemplatesPanel from '@/components/editor/TemplatesPanel.vue'
@@ -327,19 +357,12 @@ import { showSuccess, showError } from '@/utils/toast-service'
 // 使用编辑器状态管理
 const editorStore = useEditorStore()
 
-// 使用文本补全组合式函数
-const completion = useCompletion({
-  wsUrl: 'ws://localhost:8000/api/v1/completion/ws',
-  contextWindowBefore: 1536,
-  contextWindowAfter: 256
-})
-
 // 编辑器状态
 const textEditorRef = ref(null)
 const editorContent = ref('<p>欢迎使用墨井智能写作助手！</p>')
-const isConnected = computed(() => completion.isConnected)
-const aiStatus = computed(() => completion.status)
-const currentCompletion = ref('')
+const isConnected = ref(true) // Since we are not using WebSocket, we can assume it's always "connected"
+const aiStatus = ref('idle')
+const completionSuggestion = ref('') // 用于存储AI建议
 
 // UI 面板控制 - 默认打开AI聊天和引用管理
 const showChatPanel = ref(true) // AI聊天面板默认显示
@@ -355,7 +378,24 @@ const outlineTopicInput = ref('')
 const selectedDocumentType = ref('essay')
 const isGeneratingOutline = ref(false) // 添加大纲生成loading状态
 
-// 浮动工具条状态
+// 翻译语言选择状态
+const showTranslateOptions = ref(false)
+const translateTargetLanguage = ref('auto') // 默认为自动检测
+const pendingTranslateData = ref(null) // 保存待翻译的文本和位置信息
+
+// 支持的翻译语言列表
+const translateLanguages = [
+  { code: 'auto', name: '自动检测目标语言' },
+  { code: 'zh', name: '中文' },
+  { code: 'en', name: 'English' },
+  { code: 'ja', name: '日本語' },
+  { code: 'ko', name: '한국어' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'es', name: 'Español' },
+  { code: 'ru', name: 'Русский' },
+  { code: 'ar', name: 'العربية' }
+]
 const showFloatingMenu = ref(false)
 const floatingMenuPosition = ref({ top: 0, left: 0 })
 const selectedText = ref('')
@@ -459,66 +499,59 @@ const wordCount = computed(() => {
 
 
 
-// 监听补全状态变化
-watch(() => completion.isConnected, (newValue) => {
-  editorStore.setConnectionStatus(newValue)
-})
-
-watch(() => completion.status, (newValue) => {
-  editorStore.updateAiStatus(newValue)
-})
-
-watch(() => completion.currentCompletion, (newValue) => {
-  currentCompletion.value = newValue
-  
-  // 如果有新的补全内容，更新编辑器状态管理中的补全文本
-  if (newValue) {
-    editorStore.updateCompletionText(newValue)
-  }
-  
-  // 如果补全完成，清除auto-complete的loading状态
-  if (newValue && aiProcessingType.value === 'auto-complete') {
-    isAiProcessing.value = false
-    aiProcessingType.value = ''
-  }
-})
-
-// 监听编辑器状态管理中的补全文本变化
-watch(() => editorStore.completionText, (newValue) => {
-  // 更新当前补全内容
-  currentCompletion.value = newValue
-})
-
 // 处理自动完成请求
-const handleRequestCompletion = (data) => {
-  // 检查AI连接状态
-  if (!isConnected.value) {
-    console.warn('AI服务未连接，跳过自动完成请求')
-    return
-  }
-  
+const handleRequestCompletion = async (data) => {
+  const editor = textEditorRef.value?.editor
+  if (!editor) return
+
   // 检查是否已经在处理中
-  if (completion.isGenerating.value || aiStatus.value === 'processing') {
+  if (isAiProcessing.value) {
     console.log('正在处理其他AI请求，跳过自动完成')
     return
   }
-  
+
   // 检查文本内容长度
   if (!data.text || data.text.length < 10) {
     console.log('文本内容过短，跳过自动完成')
     return
   }
+
+  isAiProcessing.value = true
+  aiStatus.value = 'processing'
   
-  // 使用completion组合式函数请求自动完成
-  const success = completion.requestCompletion(
-    data.text,
-    data.contextBefore,
-    data.contextAfter,
-    data.cursorPosition
-  )
-  
-  if (!success) {
-    console.warn('自动完成请求失败')
+  try {
+    const response = await fetch('/api/v1/completion/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: data.text,
+        context_before: data.contextBefore,
+        context_after: data.contextAfter,
+        max_tokens: 64,
+        temperature: 0.6
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || '自动完成失败')
+    }
+
+    const result = await response.json()
+    if (result.completion && result.completion.trim()) {
+      // 将结果传递给编辑器显示
+      if (textEditorRef.value) {
+        textEditorRef.value.showSuggestion(result.completion.trim())
+      }
+    }
+  } catch (error) {
+    console.error('自动完成请求失败:', error)
+    if (error.message !== '自动完成失败') {
+      showError(error.message)
+    }
+  } finally {
+    isAiProcessing.value = false
+    aiStatus.value = 'idle'
   }
 }
 
@@ -537,15 +570,23 @@ const handleTextChange = (text) => {
 }
 
 // 处理补全接受
-const handleCompletionAccepted = (completionText) => {
-  // 通知编辑器状态管理补全已接受
-  editorStore.acceptCompletion()
+const handleCompletionAccepted = (suggestion) => {
+  const editor = textEditorRef.value?.editor
+  if (editor && suggestion && suggestion.trim()) {
+    editor.chain().focus().insertContent(suggestion.trim()).run()
+  }
+  // 清空编辑器中的建议显示
+  if (textEditorRef.value) {
+    textEditorRef.value.hideSuggestion()
+  }
 }
 
-//処理补全拒绝
+// 处理补全拒绝
 const handleCompletionRejected = () => {
-  // 通知编辑器状态管理补全已拒绝
-  editorStore.rejectCompletion()
+  // 清空编辑器中的建议显示
+  if (textEditorRef.value) {
+    textEditorRef.value.hideSuggestion()
+  }
 }
 
 // 处理AI聊天面板插入文本
@@ -569,8 +610,6 @@ const handleUseTemplate = (template) => {
   
   // 关闭模板面板
   showTemplatesPanel.value = false
-  
-  showSuccess(`已应用模板: ${template.name}`)
 }
 
 // 处理添加引用
@@ -677,63 +716,74 @@ const getEnhancedContextWindow = (editor, cursorPosition) => {
 
 // AI辅助功能处理方法
 const handleAutoComplete = async () => {
-  const editor = textEditorRef.value.editor
+  const editor = textEditorRef.value?.editor
   if (!editor) return
-  
-  // 检查AI连接状态
-  if (!isConnected.value) {
-    showError('AI服务未连接，无法使用自动完成功能')
-    return
-  }
-  
+
   // 获取当前编辑器内容和光标位置
   const currentText = editor.getText()
   const { from } = editor.state.selection
-  
+
   // 检查是否有足够的文本内容
   if (!currentText.trim() || currentText.trim().length < 10) {
     showError('请输入更多文本内容以使用智能续写功能')
     return
   }
-  
+
   // 设置loading状态
   isAiProcessing.value = true
   aiProcessingType.value = 'auto-complete'
-  
+  aiStatus.value = 'processing'
+
   try {
-    // 获取上下文窗口 - 改进版本，获取更智能的上下文
+    // 获取上下文窗口
     const contextWindow = getEnhancedContextWindow(editor, from)
     const { before, after } = contextWindow
-    
-    // 显示加载状态
-    editorStore.updateAiStatus('智能续写中...')
-    
-    // 请求文本补全，传递更详细的上下文信息
-    completion.requestCompletion(currentText, before, after, from)
+
+    const response = await fetch('/api/v1/completion/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: currentText,
+        context_before: before,
+        context_after: after,
+        max_tokens: 128,
+        temperature: 0.6
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || '智能续写失败')
+    }
+
+    const result = await response.json()
+    if (result.completion && result.completion.trim()) {
+      // 显示建议
+      if (textEditorRef.value) {
+        textEditorRef.value.showSuggestion(result.completion.trim())
+        showSuccess('AI已生成续写建议')
+      }
+    }
   } catch (error) {
     console.error('智能续写失败:', error)
-    showError('智能续写失败，请重试')
+    showError(error.message)
   } finally {
     // 清除loading状态
     isAiProcessing.value = false
     aiProcessingType.value = ''
+    aiStatus.value = 'idle'
   }
 }
 
+
 const handleSimplify = async () => {
-  const editor = textEditorRef.value.editor
+  const editor = textEditorRef.value?.editor
   if (!editor) return
   
   // 检查是否有选中文本
   const { from, to } = editor.state.selection
   if (from === to || !selectedText.value.trim()) {
     showError('请先选择要简化的文本')
-    return
-  }
-  
-  // 检查AI连接状态
-  if (!isConnected.value) {
-    showError('AI服务未连接，无法使用简化功能')
     return
   }
   
@@ -752,26 +802,38 @@ const handleSimplify = async () => {
         text: selectedText.value,
         action: 'simplify',
         context_before: editor.state.doc.textBetween(0, from),
-        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size),
+        temperature: 0.5
       })
     })
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const errorData = await response.json()
+      throw new Error(errorData.detail || '简化失败')
     }
     
     const data = await response.json()
     
-    if (data.completion) {
-      // 替换选中的文本
-      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
-      showSuccess('文本简化完成')
+    if (data.completion && data.completion.trim()) {
+      // 显示建议，而不是直接替换
+      if (textEditorRef.value) {
+        // 保存选中的文本和位置，用于后续替换
+        textEditorRef.value.pendingReplacement = {
+          from,
+          to,
+          originalText: selectedText.value,
+          newText: data.completion.trim(),
+          action: 'simplify'
+        }
+        textEditorRef.value.showSuggestion(data.completion.trim(), true)
+        showSuccess(`简化建议已生成`)
+      }
     } else {
       throw new Error('未收到简化结果')
     }
   } catch (error) {
     console.error('简化失败:', error)
-    showError('简化失败，请重试')
+    showError(error.message || '简化失败，请重试')
   } finally {
     // 清除loading状态
     isAiProcessing.value = false
@@ -780,19 +842,13 @@ const handleSimplify = async () => {
 }
 
 const handleRewrite = async () => {
-  const editor = textEditorRef.value.editor
+  const editor = textEditorRef.value?.editor
   if (!editor) return
   
   // 检查是否有选中文本
   const { from, to } = editor.state.selection
   if (from === to || !selectedText.value.trim()) {
     showError('请先选择要改写的文本')
-    return
-  }
-  
-  // 检查AI连接状态
-  if (!isConnected.value) {
-    showError('AI服务未连接，无法使用改写功能')
     return
   }
   
@@ -811,26 +867,38 @@ const handleRewrite = async () => {
         text: selectedText.value,
         action: 'rewrite',
         context_before: editor.state.doc.textBetween(0, from),
-        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size),
+        temperature: 0.7
       })
     })
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const errorData = await response.json()
+      throw new Error(errorData.detail || '改写失败')
     }
     
     const data = await response.json()
     
-    if (data.completion) {
-      // 替换选中的文本
-      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
-      showSuccess('文本改写完成')
+    if (data.completion && data.completion.trim()) {
+      // 显示建议，而不是直接替换
+      if (textEditorRef.value) {
+        // 保存选中的文本和位置，用于后续替换
+        textEditorRef.value.pendingReplacement = {
+          from,
+          to,
+          originalText: selectedText.value,
+          newText: data.completion.trim(),
+          action: 'rewrite'
+        }
+        textEditorRef.value.showSuggestion(data.completion.trim(), true)
+        showSuccess(`改写建议已生成`)
+      }
     } else {
       throw new Error('未收到改写结果')
     }
   } catch (error) {
     console.error('改写失败:', error)
-    showError('改写失败，请重试')
+    showError(error.message || '改写失败，请重试')
   } finally {
     // 清除loading状态
     isAiProcessing.value = false
@@ -839,19 +907,13 @@ const handleRewrite = async () => {
 }
 
 const handleExpand = async () => {
-  const editor = textEditorRef.value.editor
+  const editor = textEditorRef.value?.editor
   if (!editor) return
   
   // 检查是否有选中文本
   const { from, to } = editor.state.selection
   if (from === to || !selectedText.value.trim()) {
     showError('请先选择要扩写的文本')
-    return
-  }
-  
-  // 检查AI连接状态
-  if (!isConnected.value) {
-    showError('AI服务未连接，无法使用扩写功能')
     return
   }
   
@@ -870,26 +932,38 @@ const handleExpand = async () => {
         text: selectedText.value,
         action: 'expand',
         context_before: editor.state.doc.textBetween(0, from),
-        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size),
+        temperature: 0.8
       })
     })
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const errorData = await response.json()
+      throw new Error(errorData.detail || '扩写失败')
     }
     
     const data = await response.json()
     
-    if (data.completion) {
-      // 替换选中的文本
-      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
-      showSuccess('文本扩写完成')
+    if (data.completion && data.completion.trim()) {
+      // 显示建议，而不是直接替换
+      if (textEditorRef.value) {
+        // 保存选中的文本和位置，用于后续替换
+        textEditorRef.value.pendingReplacement = {
+          from,
+          to,
+          originalText: selectedText.value,
+          newText: data.completion.trim(),
+          action: 'expand'
+        }
+        textEditorRef.value.showSuggestion(data.completion.trim(), true)
+        showSuccess(`扩写建议已生成`)
+      }
     } else {
       throw new Error('未收到扩写结果')
     }
   } catch (error) {
     console.error('扩写失败:', error)
-    showError('扩写失败，请重试')
+    showError(error.message || '扩写失败，请重试')
   } finally {
     // 清除loading状态
     isAiProcessing.value = false
@@ -897,25 +971,49 @@ const handleExpand = async () => {
   }
 }
 
-const handleTranslate = async () => {
-  const editor = textEditorRef.value.editor
+const handleTranslate = async (targetLanguage = null) => {
+  const editor = textEditorRef.value?.editor
   if (!editor) return
   
-  // 调试信息
-  console.log('=== 翻译功能被调用 ===')
-  console.log('Selected text:', selectedText.value)
-  
-  // 检查是否有选中文本
-  const { from, to } = editor.state.selection
-  if (from === to || !selectedText.value.trim()) {
-    showError('请先选择要翻译的文本')
+  // 如果没有指定目标语言，需要获取选中文本并显示语言选择选项
+  if (!targetLanguage) {
+    // 检查是否有选中文本
+    const { from, to } = editor.state.selection
+    if (from === to || !selectedText.value.trim()) {
+      showError('请先选择要翻译的文本')
+      return
+    }
+    
+    // 保存待翻译的数据
+    pendingTranslateData.value = {
+      text: selectedText.value.trim(),
+      from,
+      to,
+      contextBefore: editor.state.doc.textBetween(0, from),
+      contextAfter: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+    }
+    
+    showTranslateOptions.value = true
     return
   }
   
-  // 检查AI连接状态
-  if (!isConnected.value) {
-    showError('AI服务未连接，无法使用翻译功能')
-    return
+  // 使用保存的翻译数据或当前选中的文本
+  let translateData = pendingTranslateData.value
+  if (!translateData) {
+    // 如果没有保存的数据，使用当前选中的文本
+    const { from, to } = editor.state.selection
+    if (from === to || !selectedText.value.trim()) {
+      showError('请先选择要翻译的文本')
+      return
+    }
+    
+    translateData = {
+      text: selectedText.value.trim(),
+      from,
+      to,
+      contextBefore: editor.state.doc.textBetween(0, from),
+      contextAfter: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+    }
   }
   
   // 设置loading状态
@@ -924,50 +1022,77 @@ const handleTranslate = async () => {
   
   try {
     // 调用后端API进行文本翻译
-    console.log('=== 发送翻译请求到后端 ===')
-    console.log('Request body:', {
-      text: selectedText.value,
-      action: 'translate',
-      context_before: editor.state.doc.textBetween(0, from),
-      context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
-    })
-    
     const response = await fetch('/api/v1/completion/optimize', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: selectedText.value,
+        text: translateData.text,
         action: 'translate',
-        context_before: editor.state.doc.textBetween(0, from),
-        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+        target_language: targetLanguage,
+        context_before: translateData.contextBefore,
+        context_after: translateData.contextAfter,
+        temperature: 0.5
       })
     })
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const errorData = await response.json()
+      throw new Error(errorData.detail || '翻译失败')
     }
     
-    const data = await response.json()
-    console.log('=== 收到翻译响应 ===')
-    console.log('Response data:', data)
+    // 检查响应内容类型
+    const contentType = response.headers.get('content-type')
+    let translatedText = ''
     
-    if (data.completion) {
-      // 替换选中的文本
-      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
-      showSuccess('文本翻译完成')
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json()
+      translatedText = data.completion || ''
+    } else {
+      translatedText = await response.text()
+    }
+    
+    if (translatedText && translatedText.trim()) {
+      // 显示建议，而不是直接替换
+      if (textEditorRef.value) {
+        // 保存选中的文本和位置，用于后续替换
+        textEditorRef.value.pendingReplacement = {
+          from: translateData.from,
+          to: translateData.to,
+          originalText: translateData.text,
+          newText: translatedText.trim(),
+          action: 'translate',
+          targetLanguage
+        }
+        textEditorRef.value.showSuggestion(translatedText.trim(), true)
+        showSuccess(`翻译建议已生成`)
+      }
     } else {
       throw new Error('未收到翻译结果')
     }
   } catch (error) {
     console.error('翻译失败:', error)
-    showError('翻译失败，请重试')
+    showError(error.message || '翻译失败，请重试')
   } finally {
-    // 清除loading状态
+    // 清除loading状态和临时数据
     isAiProcessing.value = false
     aiProcessingType.value = ''
+    pendingTranslateData.value = null
   }
+}
+
+// 选择翻译目标语言
+const selectTranslateLanguage = (languageCode) => {
+  translateTargetLanguage.value = languageCode
+  showTranslateOptions.value = false
+  handleTranslate(languageCode)
+}
+
+// 取消翻译语言选择
+const cancelTranslate = () => {
+  showTranslateOptions.value = false
+  pendingTranslateData.value = null
 }
 
 // 大纲功能方法
@@ -1218,9 +1343,6 @@ const handleFloatingAction = (action) => {
     default:
       console.warn('未知的浮动工具条操作:', action)
   }
-  
-  // 隐藏浮动工具条
-  hideFloatingToolbar()
 }
 
 // 从选中文本生成大纲
@@ -1496,12 +1618,7 @@ const handleAiAction = (action) => {
 
 // 生命周期钩子
 onMounted(() => {
-  // WebSocket连接已经在useCompletion中自动建立
-})
-
-onBeforeUnmount(() => {
-  // 断开WebSocket连接
-  completion.disconnect()
+  // 可以在这里处理一些初始化逻辑，如果需要的话
 })
 </script>
 

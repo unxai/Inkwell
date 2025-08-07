@@ -57,7 +57,19 @@ class WebSocketService {
       };
 
       this.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+        console.log('WebSocket received raw data:', event.data); // 调试日志
+        let data;
+        try {
+          // 尝试解析为JSON
+          data = JSON.parse(event.data);
+        } catch (error) {
+          // 如果解析失败，直接将原始数据作为消息内容
+          console.warn('WebSocket收到的消息不是有效的JSON格式:', event.data);
+          // 可以根据业务需求决定如何处理非JSON数据
+          // 这里我们简单地将其包装在一个对象中，以便后续处理
+          data = { type: 'raw', content: event.data };
+        }
+
         this._notifyListeners('message', data);
 
         // 处理补全消息（包括错误消息）

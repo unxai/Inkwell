@@ -150,28 +150,28 @@ const props = defineProps({
 const emit = defineEmits(['action'])
 
 /**
- * 计算箭头位置
+ * 计算箭头位置 - 优化定位逻辑
  */
 const getArrowPosition = () => {
-  // 工具条显示在选中文本上方时，箭头在底部指向选中文本
-  // 工具条显示在选中文本下方时，箭头在顶部指向选中文本
+  // 获取当前视口高度的中点
+  const viewportMiddle = window.innerHeight / 2
   
-  // 根据工具条位置判断箭头应该在上方还是下方
-  const isToolbarAbove = props.position.top > 100 // 如果工具条top值大于100，认为是在上方
+  // 判断工具条是在视口上半部分还是下半部分
+  const isToolbarInUpperHalf = props.position.top < viewportMiddle
   
-  if (isToolbarAbove) {
-    // 工具条在选中文本上方，箭头在工具条底部
-    return {
-      top: '100%',
-      left: '50%',
-      transform: 'translateX(-50%)'
-    }
-  } else {
-    // 工具条在选中文本下方，箭头在工具条顶部
+  if (isToolbarInUpperHalf) {
+    // 工具条在视口上半部分，通常显示在选中文本下方，箭头在工具条顶部
     return {
       top: '-8px',
       left: '50%',
       transform: 'translateX(-50%) rotate(180deg)'
+    }
+  } else {
+    // 工具条在视口下半部分，通常显示在选中文本上方，箭头在工具条底部
+    return {
+      top: '100%',
+      left: '50%',
+      transform: 'translateX(-50%)'
     }
   }
 }

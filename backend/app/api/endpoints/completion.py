@@ -4,7 +4,7 @@ import time
 from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, WebSocket, HTTPException, Request, Depends, status, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.api.endpoints.websocket import manager
 from app.models.completion import CompletionRequest, CompletionResponse
@@ -62,12 +62,16 @@ async def process_streaming_completion(
     try:
         # 根据操作类型选择不同的处理方法
         if action in ["rewrite", "expand", "simplify", "translate"]:
+            # 获取目标语言参数（如果有的话）
+            target_language = request_data.get("target_language")
+            
             # 使用文本优化服务
             async for chunk in OpenAIService.optimize_text(
                 text=text,
                 action=action,
                 temperature=temperature,
-                stream=True
+                stream=True,
+                target_language=target_language
             ):
                 # 检查连接状态
                 if websocket.client_state.name != "CONNECTED":
@@ -388,18 +392,11 @@ async def optimize_text(request: CompletionRequest, rate_limit_check=Depends(che
     if rate_limit_check:
         return rate_limit_check
     
-    # 从请求中获取action参数，默认为rewrite
+    # 从请求中获取参数
     action = getattr(request, 'action', 'rewrite')
+    target_language = getattr(request, 'target_language', None)
     request_id = f"req_{int(time.time() * 1000)}"
-    
-    # 调试信息
-    print(f"=== 收到优化请求 ===")
-    print(f"Request ID: {request_id}")
-    print(f"Action: {action}")
-    print(f"Text: {request.text[:100]}...")  # 只打印前100字符
-    print(f"Request object attributes: {dir(request)}")
-    print(f"Full request data: {request.dict() if hasattr(request, 'dict') else 'No dict method'}")
-    
+   
     # 记录请求
     logger.info({
         "message": "收到文本优化请求",
@@ -414,7 +411,8 @@ async def optimize_text(request: CompletionRequest, rate_limit_check=Depends(che
             text=request.text,
             action=action,
             temperature=request.temperature,
-            stream=False
+            stream=False,
+            target_language=target_language
         )
         
         # 获取优化结果
@@ -423,6 +421,9 @@ async def optimize_text(request: CompletionRequest, rate_limit_check=Depends(che
                 print(f"=== 优化完成 ===")
                 print(f"Action: {action}")
                 print(f"Result: {chunk['completion'][:100]}...")
+                
+                if action == "translate":
+                    return PlainTextResponse(content=chunk["completion"])
                 
                 return CompletionResponse(
                     completion=chunk["completion"],

@@ -302,6 +302,38 @@ class OpenAIService:
             请直接输出补全内容，确保语言自然且内容完整。"""
     
     @staticmethod
+    def build_user_prompt(context_text: str, context_after: str = None) -> str:
+        """
+        构建用户输入，区分主要上下文和后续文本
+        
+        参数:
+        - context_text: 主要上下文
+        - context_after: 光标后的文本
+        
+        返回:
+        - 格式化的用户提示
+        """
+        if context_after:
+            return f"""这是当前的上下文：
+---
+{context_text}
+---
+
+这是光标后的内容，请在续写时考虑到：
+---
+{context_after}
+---
+
+请从 `{context_text}` 的结尾处开始续写。"""
+        else:
+            return f"""请根据以下上下文进行续写：
+---
+{context_text}
+---
+
+请从 `{context_text}` 的结尾处开始续写。"""
+    
+    @staticmethod
     def is_completion_sufficient(completion_text: str, context_type: str) -> bool:
         """
         检查补全是否已经足够（调整为更合理的长度要求）
@@ -560,7 +592,8 @@ class OpenAIService:
         text: str,
         action: str = "rewrite",
         temperature: float = 0.7,
-        stream: bool = True
+        stream: bool = True,
+        target_language: Optional[str] = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         优化文本（改写、扩写、简化、翻译）
@@ -602,16 +635,43 @@ class OpenAIService:
 5. 让文本更易理解和阅读
 6. 直接输出简化后的内容，不要添加说明或解释""",
             
-            "translate": """你是一个专业的翻译助手。请将用户提供的文本进行智能翻译，要求：
-1. 如果是中文，翻译成自然流畅的英文
-2. 如果是英文，翻译成自然地道的中文
-3. 如果是其他语言，翻译成中文
-4. 保持原文的语调、风格和专业程度
-5. 确保翻译准确、自然、符合目标语言习惯
-6. 直接输出翻译结果，不要添加说明或解释"""
+            "translate": """你是一个专业的翻译助手。请将用户提供的文本进行智能翻译，严格按照以下要求：
+1. 如果指定了目标语言，请翻译成该语言
+2. 如果是中文且未指定目标语言，翻译成自然流畅的英文
+3. 如果是英文且未指定目标语言，翻译成自然地道的中文
+4. 如果是其他语言且未指定目标语言，翻译成中文
+5. 保持原文的语调、风格和专业程度
+6. 确保翻译准确、自然、符合目标语言习惯
+7. 直接输出翻译结果，不要添加任何说明、解释、引号或前缀
+8. 不要说"好的，请提供"、"Okay, please provide"等无关内容
+9. 只返回纯粹的翻译内容"""
         }
         
         system_prompt = system_prompts.get(action, system_prompts["rewrite"])
+        
+        # 如果是翻译操作且指定了目标语言，动态生成提示词
+        if action == "translate" and target_language:
+            language_names = {
+                'zh': '中文',
+                'en': '英文',
+                'ja': '日文',
+                'ko': '韩文',
+                'fr': '法文',
+                'de': '德文',
+                'es': '西班牙文',
+                'ru': '俄文',
+                'ar': '阿拉伯文'
+            }
+            target_lang_name = language_names.get(target_language, target_language)
+            
+            system_prompt = f"""你是一个专业的翻译助手。请将用户提供的文本翻译成{target_lang_name}，严格按照以下要求：
+1. 翻译结果必须是{target_lang_name}
+2. 保持原文的语调、风格和专业程度
+3. 确保翻译准确、自然、符合{target_lang_name}的语言习惯
+4. 直接输出翻译结果，不要添加任何说明、解释、引号或前缀
+5. 不要说"好的，请提供"、"Okay, please provide"等无关内容
+6. 只返回纯粹的翻译内容
+7. 如果原文已经是{target_lang_name}，请优化表达使其更加地道"""
         
         # 构建消息
         messages = [
