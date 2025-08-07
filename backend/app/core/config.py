@@ -30,10 +30,5 @@ class Settings(BaseSettings):
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     
-    @validator("OPENAI_API_KEY")
-    def validate_openai_api_key(cls, v):
-        if not v:
-            print("警告: 未设置OPENAI_API_KEY环境变量，某些功能可能无法正常工作")
-        return v
 
 settings = Settings()

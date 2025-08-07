@@ -3,7 +3,7 @@ import json
 import time
 from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, WebSocket, HTTPException, Request, Depends, status
+from fastapi import APIRouter, WebSocket, HTTPException, Request, Depends, status, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from app.api.endpoints.websocket import manager
@@ -33,24 +33,35 @@ async def process_streaming_completion(
     - action: 操作类型，可选值为 "completion"(补全), "rewrite"(改写), "expand"(扩写), "simplify"(简化)
     - cursor_position: 光标位置，用于上下文窗口管理
     """
+    # 检查连接是否仍然有效
+    if websocket.client_state.name != "CONNECTED":
+        logger.info({
+            "message": "WebSocket连接已关闭，跳过处理",
+            "connection_id": connection_id,
+            "action": action
+        })
+        return
+        
     # 检查速率限制
     # 不同操作类型消耗不同的令牌数
     cost = 2.0 if action in ["rewrite", "expand", "simplify"] else 1.0
     
     if not ws_limiter.check_rate_limit(connection_id, cost):
         retry_after = ws_limiter.get_retry_after(connection_id, cost)
-        await manager.send_json(websocket, {
+        success = await manager.send_json(websocket, {
             "type": "error",
             "error": f"请求过于频繁，请等待{retry_after}秒后再试",
             "action": action,
             "status": "rate_limited",
             "retry_after": retry_after
         })
+        if not success:
+            logger.info({"message": "发送速率限制消息失败，连接可能已关闭", "connection_id": connection_id})
         return
     
     try:
         # 根据操作类型选择不同的处理方法
-        if action in ["rewrite", "expand", "simplify"]:
+        if action in ["rewrite", "expand", "simplify", "translate"]:
             # 使用文本优化服务
             async for chunk in OpenAIService.optimize_text(
                 text=text,
@@ -58,8 +69,19 @@ async def process_streaming_completion(
                 temperature=temperature,
                 stream=True
             ):
+                # 检查连接状态
+                if websocket.client_state.name != "CONNECTED":
+                    logger.info({
+                        "message": "WebSocket连接已关闭，停止发送数据",
+                        "connection_id": connection_id,
+                        "action": action
+                    })
+                    break
+                    
                 # 将API响应转发给WebSocket客户端
-                await manager.send_json(websocket, chunk)
+                success = await manager.send_json(websocket, chunk)
+                if not success:
+                    break
         else:
             # 使用文本补全服务
             async for chunk in OpenAIService.generate_completion(
@@ -71,8 +93,19 @@ async def process_streaming_completion(
                 temperature=temperature,
                 stream=True
             ):
+                # 检查连接状态
+                if websocket.client_state.name != "CONNECTED":
+                    logger.info({
+                        "message": "WebSocket连接已关闭，停止发送数据",
+                        "connection_id": connection_id,
+                        "action": action
+                    })
+                    break
+                    
                 # 将API响应转发给WebSocket客户端
-                await manager.send_json(websocket, chunk)
+                success = await manager.send_json(websocket, chunk)
+                if not success:
+                    break
     except Exception as e:
         # 记录错误
         logger.error({
@@ -82,23 +115,26 @@ async def process_streaming_completion(
             "error": str(e)
         })
         
-        # 发送错误消息
-        await manager.send_json(websocket, {
-            "type": "error",
-            "error": str(e),
-            "action": action,
-            "status": "error"
-        })
+        # 只在连接有效时发送错误消息
+        if websocket.client_state.name == "CONNECTED":
+            await manager.send_json(websocket, {
+                "type": "error",
+                "error": str(e),
+                "action": action,
+                "status": "error"
+            })
 
 @router.websocket("/ws")
 async def websocket_completion(websocket: WebSocket):
     """
     通过WebSocket提供实时文本补全和优化功能
     """
-    # 建立连接并获取连接ID
-    connection_id = await manager.connect(websocket)
+    connection_id = None
     
     try:
+        # 建立连接并获取连接ID
+        connection_id = await manager.connect(websocket)
+        
         # 发送欢迎消息
         await manager.send_json(websocket, {
             "type": "system",
@@ -109,10 +145,19 @@ async def websocket_completion(websocket: WebSocket):
         
         # 主消息循环
         while True:
-            # 接收消息
-            data = await websocket.receive_text()
-            
             try:
+                # 检查连接状态
+                if websocket.client_state.name != "CONNECTED":
+                    logger.info({
+                        "message": "WebSocket连接已关闭",
+                        "connection_id": connection_id,
+                        "state": websocket.client_state.name
+                    })
+                    break
+                
+                # 接收消息
+                data = await websocket.receive_text()
+                
                 # 解析JSON数据
                 request_data = json.loads(data)
                 
@@ -149,29 +194,90 @@ async def websocket_completion(websocket: WebSocket):
                     )
                 )
                 
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 # JSON解析错误
                 logger.warning({
                     "message": "WebSocket消息格式错误",
-                    "connection_id": connection_id
+                    "connection_id": connection_id,
+                    "error": str(e)
                 })
                 
-                await manager.send_json(websocket, {
-                    "type": "error",
-                    "error": "消息格式错误，请发送有效的JSON数据",
-                    "status": "invalid_format"
+                # 只在连接有效时发送错误消息
+                if websocket.client_state.name == "CONNECTED":
+                    success = await manager.send_json(websocket, {
+                        "type": "error",
+                        "error": "消息格式错误，请发送有效的JSON数据",
+                        "status": "invalid_format"
+                    })
+                    if not success:
+                        break
+                else:
+                    break
+                
+            except RuntimeError as e:
+                # 连接已关闭的错误
+                if "disconnect message has been received" in str(e) or "Cannot call" in str(e):
+                    logger.info({
+                        "message": "WebSocket连接已断开",
+                        "connection_id": connection_id
+                    })
+                    break
+                else:
+                    # 其他RuntimeError
+                    logger.error({
+                        "message": "处理WebSocket消息时出错",
+                        "connection_id": connection_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    })
+                    break
+                    
+            except Exception as e:
+                # 消息处理错误
+                logger.error({
+                    "message": "处理WebSocket消息时出错",
+                    "connection_id": connection_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__
                 })
                 
+                # 只在连接有效时发送错误消息
+                if websocket.client_state.name == "CONNECTED":
+                    success = await manager.send_json(websocket, {
+                        "type": "error",
+                        "error": "处理消息时出错",
+                        "status": "processing_error"
+                    })
+                    if not success:
+                        break
+                else:
+                    break
+                
+    except WebSocketDisconnect as e:
+        # 正常的WebSocket断开连接
+        logger.info({
+            "message": "WebSocket客户端正常断开连接",
+            "connection_id": connection_id or "unknown",
+            "code": e.code,
+            "reason": e.reason if hasattr(e, 'reason') else "未知原因"
+        })
+        
     except Exception as e:
-        # 记录错误
+        # 其他异常错误
+        error_type = type(e).__name__
+        error_message = str(e)
+        
         logger.error({
             "message": "WebSocket连接错误",
-            "connection_id": connection_id if 'connection_id' in locals() else "unknown",
-            "error": str(e)
+            "connection_id": connection_id or "unknown",
+            "error_type": error_type,
+            "error": error_message
         })
+        
     finally:
-        # 断开连接
-        manager.disconnect(websocket)
+        # 确保连接被正确清理
+        if websocket:
+            manager.disconnect(websocket)
 
 # 速率限制依赖项
 async def check_api_rate_limit(request: Request):
@@ -276,14 +382,23 @@ async def generate_completion(request: CompletionRequest, rate_limit_check=Depen
 @router.post("/optimize")
 async def optimize_text(request: CompletionRequest, rate_limit_check=Depends(check_api_rate_limit)):
     """
-    优化文本（改写/扩写/简化）
+    优化文本（改写/扩写/简化/翻译）
     """
     # 如果速率限制检查返回了响应，直接返回该响应
     if rate_limit_check:
         return rate_limit_check
     
-    action = request.action if hasattr(request, 'action') else "rewrite"
+    # 从请求中获取action参数，默认为rewrite
+    action = getattr(request, 'action', 'rewrite')
     request_id = f"req_{int(time.time() * 1000)}"
+    
+    # 调试信息
+    print(f"=== 收到优化请求 ===")
+    print(f"Request ID: {request_id}")
+    print(f"Action: {action}")
+    print(f"Text: {request.text[:100]}...")  # 只打印前100字符
+    print(f"Request object attributes: {dir(request)}")
+    print(f"Full request data: {request.dict() if hasattr(request, 'dict') else 'No dict method'}")
     
     # 记录请求
     logger.info({
@@ -305,6 +420,10 @@ async def optimize_text(request: CompletionRequest, rate_limit_check=Depends(che
         # 获取优化结果
         async for chunk in optimization_generator:
             if chunk["type"] == "end":
+                print(f"=== 优化完成 ===")
+                print(f"Action: {action}")
+                print(f"Result: {chunk['completion'][:100]}...")
+                
                 return CompletionResponse(
                     completion=chunk["completion"],
                     status="success",

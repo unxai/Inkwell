@@ -15,6 +15,10 @@ export const useEditorStore = defineStore('editor', {
   }),
   
   actions: {
+    /**
+     * 更新编辑器内容
+     * @param {string} newContent - 新的内容
+     */
     updateContent(newContent) {
       this.content = newContent
       // 更新字数统计
@@ -22,76 +26,78 @@ export const useEditorStore = defineStore('editor', {
       this.wordCount = textContent.length
     },
     
+    /**
+     * 更新AI状态
+     * @param {string} status - AI状态
+     */
     updateAiStatus(status) {
       this.aiStatus = status
     },
     
+    /**
+     * 设置连接状态
+     * @param {boolean} status - 连接状态
+     */
     setConnectionStatus(status) {
       this.isConnected = status
     },
     
-    // 更新光标位置
+    /**
+     * 更新光标位置
+     * @param {number} position - 光标位置
+     */
     updateCursorPosition(position) {
       this.cursorPosition = position
     },
     
-    // 更新补全文本
+    /**
+     * 更新补全文本
+     * @param {string} text - 补全文本
+     */
     updateCompletionText(text) {
       this.completionText = text
     },
     
-    // 设置生成状态
+    /**
+     * 设置生成状态
+     * @param {boolean} isGenerating - 是否正在生成
+     */
     setGeneratingState(isGenerating) {
       this.isGenerating = isGenerating
     },
     
-    // 清除补全文本
+    /**
+     * 清除补全文本
+     */
     clearCompletionText() {
       this.completionText = ''
     },
     
-    // 接受补全建议
+    /**
+     * 接受补全建议
+     */
     acceptCompletion() {
       // 清除补全文本
       this.completionText = ''
       this.isGenerating = false
     },
     
-    // 拒绝补全建议
+    /**
+     * 拒绝补全建议
+     */
     rejectCompletion() {
       // 清除补全文本
       this.completionText = ''
       this.isGenerating = false
     },
     
-    async getCompletion(text, contextBefore, contextAfter, cursorPosition) {
-      try {
-        this.isGenerating = true
-        this.aiStatus = '生成中...'
-        
-        const response = await axios.post('/api/v1/completion/generate', {
-          text,
-          context_before: contextBefore,
-          context_after: contextAfter,
-          cursor_position: cursorPosition,
-          max_tokens: 50
-        })
-        
-        this.completionText = response.data.completion
-        this.isGenerating = false
-        this.aiStatus = '已完成'
-        
-        return response.data.completion
-      } catch (error) {
-        console.error('获取文本补全失败:', error)
-        this.isGenerating = false
-        this.aiStatus = '错误'
-        throw error
-      }
-    },
-    
+    /**
+     * 优化文本（改写/扩写/简化）
+     * @param {string} text - 要优化的文本
+     * @param {string} type - 优化类型：'rewrite', 'expand', 'simplify'
+     * @returns {Promise<string>} 优化后的文本
+     */
     async optimizeText(text, type) {
-      // type: 'rewrite', 'expand', 'simplify'
       try {
         this.isGenerating = true
         this.aiStatus = type === 'rewrite' ? '改写中...' : 

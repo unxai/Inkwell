@@ -1,352 +1,307 @@
 <template>
   <div class="min-h-screen bg-white flex flex-col">
-    <!-- 编辑器顶部工具栏 -->
-    <div class="border-b border-gray-200 px-4 py-2 flex flex-wrap items-center justify-between gap-4 bg-white shadow-sm">
-      <div class="flex items-center space-x-4">
-        <h1 class="text-xl font-semibold text-[#1A365D]">墨井</h1>
-        <div class="flex items-center">
-          <span 
-            class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-            :class="isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-          >
+
+    <div class="border-b border-gray-200 px-4 py-2 bg-white shadow-sm">
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex items-center space-x-4">
+          <h1 class="text-xl font-semibold text-[#1A365D]">墨井</h1>
+          <div class="flex items-center">
             <span 
-              class="w-2 h-2 mr-1 rounded-full"
-              :class="isConnected ? 'bg-green-400' : 'bg-red-400'"
-            ></span>
-            {{ isConnected ? 'AI 已连接' : 'AI 未连接' }}
-          </span>
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+              :class="isConnected.value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+            >
+              <span 
+                class="w-2 h-2 mr-1 rounded-full"
+                :class="isConnected.value ? 'bg-green-400' : 'bg-red-400'"
+              ></span>
+              {{ isConnected.value ? 'AI 已连接' : 'AI 未连接' }}
+            </span>
+          </div>
         </div>
-      </div>
-      
-      <div class="flex items-center space-x-4">
-        <span class="text-sm text-gray-500">{{ wordCount }} 字</span>
-        <button 
-          @click="toggleSidebar" 
-          class="inline-flex items-center px-2 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-[#4FD1C5] focus:outline-none focus:border-[#4FD1C5] focus:shadow-outline-blue transition ease-in-out duration-150"
-        >
-          <svg class="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path v-if="!isSidebarOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          {{ isSidebarOpen ? '隐藏' : 'AI 功能' }}
-        </button>
+        
+        <div class="flex items-center">
+          <!-- 工具组 1: 文档工具 -->
+          <div class="flex items-center space-x-2 mr-4">
+            <button
+              @click="showVersionHistory = !showVersionHistory"
+              :class="showVersionHistory ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'text-gray-600 hover:text-gray-800 border-gray-200 hover:bg-gray-50'"
+              class="flex items-center px-3 py-2 rounded-lg transition-colors duration-200 border text-sm"
+              title="版本历史"
+            >
+              <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              版本历史
+            </button>
+            <button
+              @click="showExportPanel = !showExportPanel"
+              :class="showExportPanel ? 'bg-blue-100 text-blue-700 border-blue-200' : 'text-gray-600 hover:text-gray-800 border-gray-200 hover:bg-gray-50'"
+              class="flex items-center px-3 py-2 rounded-lg transition-colors duration-200 border text-sm"
+              title="导出文档"
+            >
+              <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              导出文档
+            </button>
+          </div>
+          
+          <!-- 工具组 2: 学术工具 -->
+          <div class="flex items-center space-x-2 mr-4">
+            <button
+              @click="showCitationManager = !showCitationManager"
+              :class="showCitationManager ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'text-gray-600 hover:text-gray-800 border-gray-200 hover:bg-gray-50'"
+              class="flex items-center px-3 py-2 rounded-lg transition-colors duration-200 border text-sm"
+              title="引用管理"
+            >
+              <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              引用管理
+            </button>
+            <button
+              @click="showResearchPanel = !showResearchPanel"
+              :class="showResearchPanel ? 'bg-green-100 text-green-700 border-green-200' : 'text-gray-600 hover:text-gray-800 border-gray-200 hover:bg-gray-50'"
+              class="flex items-center px-3 py-2 rounded-lg transition-colors duration-200 border text-sm"
+              title="研究助手"
+            >
+              <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              研究助手
+            </button>
+          </div>
+          
+          <!-- 工具组 3: AI 和模板工具 -->
+          <div class="flex items-center space-x-2 mr-4">
+            <button
+              @click="showTemplatesPanel = !showTemplatesPanel"
+              :class="showTemplatesPanel ? 'bg-purple-100 text-purple-700 border-purple-200' : 'text-gray-600 hover:text-gray-800 border-gray-200 hover:bg-gray-50'"
+              class="flex items-center px-3 py-2 rounded-lg transition-colors duration-200 border text-sm"
+              title="文档模板"
+            >
+              <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              文档模板
+            </button>
+          </div>
+          
+          <!-- 开始写作按钮 -->
+          <button
+            @click="showOutlineGenerator = true"
+            class="px-4 py-2 bg-[#4FD1C5] text-white rounded-lg hover:bg-[#3DB9B0] transition-colors font-medium mr-4"
+          >
+            🚀 开始写作
+          </button>
+        </div>
+        
+        <!-- AI聊天面板固定在右侧 -->
+        <div class="flex items-center">
+          <button
+            @click="showChatPanel = !showChatPanel"
+            :class="showChatPanel ? 'bg-blue-100 text-blue-700 border-blue-200' : 'text-gray-600 hover:text-gray-800 border-gray-200 hover:bg-gray-50'"
+            class="flex items-center px-3 py-2 rounded-lg transition-colors duration-200 border text-sm"
+            title="AI 聊天助手"
+          >
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+            AI 助手
+          </button>
+        </div>
       </div>
     </div>
     
-    <div class="flex flex-grow h-full">
-      <!-- 侧边功能面板 -->
-      <transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0 transform -translate-x-4"
-        enter-to-class="opacity-100 transform translate-x-0"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100 transform translate-x-0"
-        leave-to-class="opacity-0 transform -translate-x-4"
-      >
+    <div class="flex flex-grow h-full relative">
+      <!-- 左侧面板区域 -->
+      <div class="flex">
+        <!-- 版本历史面板 -->
         <div 
-          v-show="isSidebarOpen" 
-          class="w-64 bg-white border-r border-gray-200 p-4 h-full overflow-y-auto shadow-md"
+          v-if="showVersionHistory" 
+          class="w-80 border-r border-gray-200 bg-white flex-shrink-0 z-10"
         >
-                  <!-- 侧边栏标签页 -->
-          <div class="mb-4">
-            <div class="flex border-b border-gray-200">
-              <button 
-                v-for="tab in sidebarTabs" 
-                :key="tab.id"
-                @click="activeSidebarTab = tab.id"
-                :class="[
-                  'px-4 py-2 text-sm font-medium border-b-2 -mb-px',
-                  activeSidebarTab === tab.id
-                    ? 'border-[#4FD1C5] text-[#4FD1C5]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                ]"
-              >
-                {{ tab.name }}
-              </button>
-            </div>
-          </div>
-          
-          <!-- AI 辅助面板 -->
-          <div v-show="activeSidebarTab === 'ai'">
-            <ai-assist-panel
-              :is-connected="isConnected"
-              :ai-status="aiStatus"
-              :context-window-before="contextWindowBefore"
-              :context-window-after="contextWindowAfter"
-              @auto-complete="handleAutoComplete"
-              @rewrite="handleRewrite"
-              @expand="handleExpand"
-              @simplify="handleSimplify"
-            />
-          </div>
-          
-          <!-- 大纲面板 -->
-          <div v-show="activeSidebarTab === 'outline'" class="space-y-4">
-            <h3 class="font-medium text-gray-700">文档结构</h3>
-            
-            <div class="mb-4">
-              <div class="flex space-x-2 mb-2">
-                <button 
-                  @click="outlineMode = 'outline'"
-                  :class="[
-                    'flex-1 px-2 py-1 text-xs rounded-md',
-                    outlineMode === 'outline' 
-                      ? 'bg-[#4FD1C5] text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  ]"
-                >
-                  大纲视图
-                </button>
-                <button 
-                  @click="outlineMode = 'academic'"
-                  :class="[
-                    'flex-1 px-2 py-1 text-xs rounded-md',
-                    outlineMode === 'academic' 
-                      ? 'bg-[#4FD1C5] text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  ]"
-                >
-                  学术结构
-                </button>
-              </div>
-            </div>
-            
-            <!-- 大纲视图 -->
-            <div v-if="outlineMode === 'outline'">
-              <div class="outline-tree">
-                <div v-for="(item, index) in outline" :key="index" class="outline-item" :style="{ paddingLeft: `${item.level * 12}px` }">
-                  <div class="flex items-center py-1">
-                    <button @click="toggleExpand(index)" v-if="hasChildren(index)" class="mr-1 w-4 h-4 flex items-center justify-center text-xs">
-                      <span v-if="!item.expanded">▶</span>
-                      <span v-else>▼</span>
-                    </button>
-                    <span v-else class="mr-1 w-4"></span>
-                    <span class="outline-title text-sm">{{ item.title }}</span>
-                    <div class="ml-auto flex space-x-1">
-                      <button @click="editOutlineItem(index)" class="text-xs text-blue-500 hover:text-blue-700">
-                        编辑
-                      </button>
-                      <button @click="deleteOutlineItem(index)" class="text-xs text-red-500 hover:text-red-700">
-                        删除
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="mt-2">
-                <div class="flex space-x-2">
-                  <input 
-                    type="text" 
-                    v-model="newOutlineItem.title" 
-                    class="flex-1 px-2 py-1 text-sm border border-gray-300 rounded-md"
-                    placeholder="新条目标题"
-                  />
-                  <select 
-                    v-model="newOutlineItem.level" 
-                    class="w-16 px-1 py-1 text-sm border border-gray-300 rounded-md"
-                  >
-                    <option :value="1">1级</option>
-                    <option :value="2">2级</option>
-                    <option :value="3">3级</option>
-                  </select>
-                </div>
-                <button 
-                  @click="addOutlineItem" 
-                  class="mt-2 w-full px-2 py-1 text-sm bg-[#4FD1C5] text-white rounded-md hover:bg-[#3DB9B0]"
-                >
-                  添加条目
-                </button>
-              </div>
-              
-              <div class="flex space-x-2 mt-4">
-                <button 
-                  @click="generateOutlineFromDocument" 
-                  class="flex-1 px-2 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                >
-                  从文档生成
-                </button>
-                <button 
-                  @click="applyOutlineToDocument" 
-                  class="flex-1 px-2 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600"
-                >
-                  应用到文档
-                </button>
-              </div>
-            </div>
-            
-            <!-- 学术结构视图 -->
-            <div v-if="outlineMode === 'academic'" class="space-y-4">
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">论文类型</label>
-                <select 
-                  v-model="paperType" 
-                  class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                >
-                  <option value="research">研究论文</option>
-                  <option value="review">综述论文</option>
-                  <option value="case-study">案例研究</option>
-                  <option value="thesis">学位论文</option>
-                </select>
-              </div>
-              
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">学科领域</label>
-                <select 
-                  v-model="discipline" 
-                  class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                >
-                  <option value="science">自然科学</option>
-                  <option value="social">社会科学</option>
-                  <option value="humanities">人文学科</option>
-                  <option value="engineering">工程技术</option>
-                </select>
-              </div>
-              
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">论文标题</label>
-                <input 
-                  type="text" 
-                  v-model="academicTitle" 
-                  class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                  placeholder="输入论文标题"
-                />
-              </div>
-              
-              <button 
-                @click="generateStructure" 
-                class="w-full px-2 py-1 text-sm bg-[#4FD1C5] text-white rounded-md hover:bg-[#3DB9B0]"
-              >
-                生成论文结构
-              </button>
-              
-              <div v-if="structure" class="mt-4 p-2 border border-gray-200 rounded-md text-xs max-h-60 overflow-y-auto">
-                <div v-html="formattedStructure"></div>
-                <button 
-                  @click="applyStructureToDocument" 
-                  class="mt-2 w-full px-2 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                >
-                  应用到文档
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 参考文献面板 -->
-          <div v-show="activeSidebarTab === 'reference'" class="space-y-4">
-            <h3 class="font-medium text-gray-700">参考文献</h3>
-            
-            <div>
-              <label class="block text-xs font-medium text-gray-700 mb-1">引用格式</label>
-              <select 
-                v-model="citationStyle" 
-                class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-              >
-                <option value="apa">APA</option>
-                <option value="mla">MLA</option>
-                <option value="chicago">Chicago</option>
-                <option value="harvard">Harvard</option>
-              </select>
-            </div>
-            
-            <div class="space-y-2">
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">作者</label>
-                <input 
-                  type="text" 
-                  v-model="newReference.author" 
-                  class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                  placeholder="作者姓名"
-                />
-              </div>
-              
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">标题</label>
-                <input 
-                  type="text" 
-                  v-model="newReference.title" 
-                  class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                  placeholder="作品标题"
-                />
-              </div>
-              
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">出版商/期刊</label>
-                <input 
-                  type="text" 
-                  v-model="newReference.publisher" 
-                  class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                  placeholder="出版商或期刊名称"
-                />
-              </div>
-              
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">年份</label>
-                <input 
-                  type="text" 
-                  v-model="newReference.year" 
-                  class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                  placeholder="出版年份"
-                />
-              </div>
-              
-              <button 
-                @click="addReference" 
-                class="w-full px-2 py-1 text-sm bg-[#4FD1C5] text-white rounded-md hover:bg-[#3DB9B0]"
-                :disabled="!canAddReference"
-              >
-                添加引用
-              </button>
-            </div>
-            
-            <div class="references-list max-h-60 overflow-y-auto">
-              <div 
-                v-for="(reference, index) in references" 
-                :key="index"
-                class="p-2 mb-2 border border-gray-200 rounded-md text-xs"
-              >
-                <div class="flex justify-between items-start">
-                  <div class="font-medium">{{ reference.title }}</div>
-                  <button @click="deleteReference(index)" class="text-red-500 hover:text-red-700">×</button>
-                </div>
-                <div class="text-gray-600">{{ reference.author }} ({{ reference.year }})</div>
-                <div class="mt-1 p-1 bg-gray-50 rounded text-xs">
-                  {{ formatCitation(reference) }}
-                </div>
-                <button 
-                  @click="insertCitation(reference)" 
-                  class="mt-1 w-full px-2 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                >
-                  插入引用
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 样式调整面板已移除 -->
+          <version-history-panel
+            :current-content="editorContent"
+            :word-count="wordCount"
+            @toggle-panel="showVersionHistory = false"
+            @restore-version="handleRestoreVersion"
+          />
         </div>
-      </transition>
+        
+        <!-- 导出面板 -->
+        <div 
+          v-if="showExportPanel" 
+          class="w-80 border-r border-gray-200 bg-white flex-shrink-0 z-10"
+        >
+          <export-panel
+            :document-content="editorContent"
+            :word-count="wordCount"
+            :references="references"
+            @toggle-panel="showExportPanel = false"
+          />
+        </div>
+        
+        <!-- 引用管理面板 -->
+        <div 
+          v-if="showCitationManager" 
+          class="w-80 border-r border-gray-200 bg-white flex-shrink-0 z-10"
+        >
+          <citation-manager
+            :references="references"
+            @toggle-panel="showCitationManager = false"
+            @add-reference="handleAddReference"
+            @update-reference="handleUpdateReference"
+            @delete-reference="handleDeleteReference"
+            @insert-text="handleChatInsertText"
+          />
+        </div>
+        
+        <!-- 研究助手面板 -->
+        <div 
+          v-if="showResearchPanel" 
+          class="w-80 border-r border-gray-200 bg-white flex-shrink-0 z-10"
+        >
+          <research-panel
+            @toggle-panel="showResearchPanel = false"
+            @add-reference="handleAddReference"
+            @insert-text="handleChatInsertText"
+          />
+        </div>
+        
+        <!-- 模板面板 -->
+        <div 
+          v-if="showTemplatesPanel" 
+          class="w-80 border-r border-gray-200 bg-white flex-shrink-0 z-10"
+        >
+          <templates-panel
+            @toggle-panel="showTemplatesPanel = false"
+            @use-template="handleUseTemplate"
+          />
+        </div>
+      </div>
       
       <!-- 主编辑区域 -->
-      <div class="flex-1 flex flex-col h-full overflow-hidden">
-        <div class="flex-1 bg-white overflow-hidden">
+      <div class="flex-1 flex flex-col h-full overflow-hidden relative">
+        <div class="flex-1 bg-white overflow-hidden relative">
           <text-editor
             ref="textEditorRef"
             :initial-content="editorContent"
+            :auto-complete-enabled="false"
+            :is-connected="isConnected.value"
+            :references="references"
             @update:content="handleContentUpdate"
             @text-change="handleTextChange"
             @completion-accepted="handleCompletionAccepted"
             @completion-rejected="handleCompletionRejected"
+            @selection-change="handleSelectionChange"
+            @show-floating-toolbar="showFloatingToolbar"
+            @hide-floating-toolbar="hideFloatingToolbar"
+            @request-completion="handleRequestCompletion"
+          />
+          
+          <!-- 浮动工具条 -->
+          <floating-toolbar
+            :show="showFloatingMenu"
+            :position="floatingMenuPosition"
+            :selected-text="selectedText"
+            :is-processing="isAiProcessing"
+            :processing-type="aiProcessingType"
+            @action="handleFloatingAction"
           />
         </div>
         
-        <!-- 编辑器底部状态栏 -->
-        <div class="border-t border-gray-200 py-1.5 px-4 flex items-center justify-between text-xs text-gray-500 bg-gray-50 sticky bottom-0">
-          <div class="flex items-center space-x-4">
-            <span>{{ aiStatus === 'idle' ? 'AI 就绪' : aiStatus === 'processing' ? 'AI 思考中...' : 'AI 空闲' }}</span>
+        <!-- 底部工具栏 -->
+        <bottom-toolbar 
+          :editor="textEditorRef?.editor"
+          :is-connected="isConnected.value"
+          :ai-status="aiStatus.value"
+          :word-count="wordCount"
+          @format="handleFormat"
+        />
+      </div>
+      
+      <!-- AI 聊天助手面板 - 固定右侧 -->
+      <div 
+        v-if="showChatPanel" 
+        class="w-80 border-l border-gray-200 bg-white flex-shrink-0 z-10"
+      >
+        <ai-chat-panel
+          :is-connected="isConnected.value"
+          :current-document="editorContent"
+          @toggle-panel="showChatPanel = false"
+          @insert-text="handleChatInsertText"
+        />
+      </div>
+      
+      <!-- 大纲生成弹层 -->
+      <div 
+        v-if="showOutlineGenerator" 
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        @click="!isGeneratingOutline && (showOutlineGenerator = false)"
+      >
+        <div 
+          class="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative"
+          @click.stop
+        >
+          <!-- Loading 遮罩 -->
+          <div 
+            v-if="isGeneratingOutline"
+            class="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center rounded-lg z-10"
+          >
+            <div class="flex flex-col items-center">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4FD1C5]"></div>
+              <p class="mt-2 text-sm text-gray-600">AI正在智能生成大纲...</p>
+            </div>
           </div>
-          <div>
-            <span>Tab: 接受建议 | Esc: 拒绝建议</span>
+          
+          <h3 class="text-lg font-semibold mb-4">🎯 开始您的写作之旅</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">写作主题</label>
+              <input 
+                v-model="outlineTopicInput"
+                type="text" 
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#4FD1C5]"
+                placeholder="请输入您想要写作的主题或问题"
+                :disabled="isGeneratingOutline"
+                @keyup.enter="!isGeneratingOutline && generateOutlineFromTopic()"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">文档类型</label>
+              <select 
+                v-model="selectedDocumentType" 
+                :disabled="isGeneratingOutline"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#4FD1C5] disabled:bg-gray-100"
+              >
+                <option value="essay">论文/论述文</option>
+                <option value="research">研究报告</option>
+                <option value="business">商业文档</option>
+                <option value="creative">创意写作</option>
+                <option value="technical">技术文档</option>
+              </select>
+            </div>
+            <div class="flex space-x-3">
+              <button 
+                @click="generateOutlineFromTopic"
+                :disabled="!outlineTopicInput.trim() || isGeneratingOutline"
+                class="flex-1 px-4 py-2 bg-[#4FD1C5] text-white rounded-md hover:bg-[#3DB9B0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              >
+                <span v-if="!isGeneratingOutline">🤖 AI 生成大纲</span>
+                <span v-else class="flex items-center">
+                  <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  生成中...
+                </span>
+              </button>
+              <button 
+                @click="skipOutlineGeneration"
+                :disabled="isGeneratingOutline"
+                class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                直接开始
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -359,7 +314,14 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useEditorStore } from '@/store/modules/editor'
 import { useCompletion } from '@/composables/useCompletion'
 import TextEditor from '@/components/editor/TextEditor.vue'
-import AiAssistPanel from '@/components/editor/AiAssistPanel.vue'
+import AiChatPanel from '@/components/editor/AiChatPanel.vue'
+import TemplatesPanel from '@/components/editor/TemplatesPanel.vue'
+import ResearchPanel from '@/components/editor/ResearchPanel.vue'
+import CitationManager from '@/components/editor/CitationManager.vue'
+import ExportPanel from '@/components/editor/ExportPanel.vue'
+import VersionHistoryPanel from '@/components/editor/VersionHistoryPanel.vue'
+import BottomToolbar from '@/components/editor/BottomToolbar.vue'
+import FloatingToolbar from '@/components/editor/FloatingToolbar.vue'
 import { showSuccess, showError } from '@/utils/toast-service'
 
 // 使用编辑器状态管理
@@ -377,30 +339,34 @@ const textEditorRef = ref(null)
 const editorContent = ref('<p>欢迎使用墨井智能写作助手！</p>')
 const isConnected = computed(() => completion.isConnected)
 const aiStatus = computed(() => completion.status)
-const contextWindowBefore = computed(() => completion.contextWindowBefore)
-const contextWindowAfter = computed(() => completion.contextWindowAfter)
 const currentCompletion = ref('')
-const isSidebarOpen = ref(true) // 侧边栏默认打开
 
-// 侧边栏标签页
-const sidebarTabs = [
-  { id: 'ai', name: '辅助' },
-  { id: 'outline', name: '大纲' },
-  { id: 'reference', name: '参考文献' }
-]
-const activeSidebarTab = ref('ai')
-const outlineMode = ref('outline')
+// UI 面板控制 - 默认打开AI聊天和引用管理
+const showChatPanel = ref(true) // AI聊天面板默认显示
+const showTemplatesPanel = ref(false) // 模板面板显示状态  
+const showResearchPanel = ref(false) // 研究面板显示状态
+const showCitationManager = ref(true) // 引用管理面板默认显示
+const showExportPanel = ref(false) // 导出面板显示状态
+const showVersionHistory = ref(false) // 版本历史面板显示状态
+
+// 大纲生成器状态
+const showOutlineGenerator = ref(false) // 默认不显示大纲生成器
+const outlineTopicInput = ref('')
+const selectedDocumentType = ref('essay')
+const isGeneratingOutline = ref(false) // 添加大纲生成loading状态
+
+// 浮动工具条状态
+const showFloatingMenu = ref(false)
+const floatingMenuPosition = ref({ top: 0, left: 0 })
+const selectedText = ref('')
+const currentSelection = ref({ from: 0, to: 0 })
+
+// AI操作loading状态
+const isAiProcessing = ref(false)
+const aiProcessingType = ref('') // 记录当前处理的类型
 
 // 大纲状态
-const outline = ref([
-  { title: '引言', level: 1, expanded: true },
-  { title: '研究背景', level: 2, expanded: true },
-  { title: '研究意义', level: 2, expanded: true },
-  { title: '文献综述', level: 1, expanded: true },
-  { title: '研究方法', level: 1, expanded: true },
-  { title: '研究结果', level: 1, expanded: true },
-  { title: '结论与展望', level: 1, expanded: true }
-])
+const outline = ref([])
 const newOutlineItem = ref({
   title: '',
   level: 1
@@ -491,10 +457,7 @@ const wordCount = computed(() => {
   return editorStore.wordCount || 0
 })
 
-// 切换侧边栏显示状态
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value
-}
+
 
 // 监听补全状态变化
 watch(() => completion.isConnected, (newValue) => {
@@ -512,6 +475,12 @@ watch(() => completion.currentCompletion, (newValue) => {
   if (newValue) {
     editorStore.updateCompletionText(newValue)
   }
+  
+  // 如果补全完成，清除auto-complete的loading状态
+  if (newValue && aiProcessingType.value === 'auto-complete') {
+    isAiProcessing.value = false
+    aiProcessingType.value = ''
+  }
 })
 
 // 监听编辑器状态管理中的补全文本变化
@@ -519,6 +488,39 @@ watch(() => editorStore.completionText, (newValue) => {
   // 更新当前补全内容
   currentCompletion.value = newValue
 })
+
+// 处理自动完成请求
+const handleRequestCompletion = (data) => {
+  // 检查AI连接状态
+  if (!isConnected.value) {
+    console.warn('AI服务未连接，跳过自动完成请求')
+    return
+  }
+  
+  // 检查是否已经在处理中
+  if (completion.isGenerating.value || aiStatus.value === 'processing') {
+    console.log('正在处理其他AI请求，跳过自动完成')
+    return
+  }
+  
+  // 检查文本内容长度
+  if (!data.text || data.text.length < 10) {
+    console.log('文本内容过短，跳过自动完成')
+    return
+  }
+  
+  // 使用completion组合式函数请求自动完成
+  const success = completion.requestCompletion(
+    data.text,
+    data.contextBefore,
+    data.contextAfter,
+    data.cursorPosition
+  )
+  
+  if (!success) {
+    console.warn('自动完成请求失败')
+  }
+}
 
 // 处理编辑器内容更新
 const handleContentUpdate = (content) => {
@@ -540,10 +542,76 @@ const handleCompletionAccepted = (completionText) => {
   editorStore.acceptCompletion()
 }
 
-// 处理补全拒绝
+//処理补全拒绝
 const handleCompletionRejected = () => {
   // 通知编辑器状态管理补全已拒绝
   editorStore.rejectCompletion()
+}
+
+// 处理AI聊天面板插入文本
+const handleChatInsertText = (text) => {
+  const editor = textEditorRef.value?.editor
+  if (!editor || !text) return
+  
+  // 在当前光标位置插入文本
+  editor.chain().focus().insertContent(text).run()
+  showSuccess('文本已插入')
+}
+
+// 处理使用模板
+const handleUseTemplate = (template) => {
+  const editor = textEditorRef.value?.editor
+  if (!editor || !template?.content) return
+  
+  // 设置编辑器内容为模板内容
+  editor.commands.setContent(template.content)
+  editorContent.value = template.content
+  
+  // 关闭模板面板
+  showTemplatesPanel.value = false
+  
+  showSuccess(`已应用模板: ${template.name}`)
+}
+
+// 处理添加引用
+const handleAddReference = (reference) => {
+  if (!reference) return
+  
+  // 添加到引用列表
+  references.value.push(reference)
+  
+  showSuccess(`已添加引用: ${reference.title}`)
+}
+
+// 处理更新引用
+const handleUpdateReference = (index, reference) => {
+  if (index >= 0 && index < references.value.length) {
+    references.value[index] = reference
+    showSuccess('引用已更新')
+  }
+}
+
+// 处理删除引用
+const handleDeleteReference = (index) => {
+  if (index >= 0 && index < references.value.length) {
+    references.value.splice(index, 1)
+    showSuccess('引用已删除')
+  }
+}
+
+// 处理版本恢复
+const handleRestoreVersion = (content) => {
+  const editor = textEditorRef.value?.editor
+  if (!editor || !content) return
+  
+  // 设置编辑器内容为恢复的版本
+  editor.commands.setContent(content)
+  editorContent.value = content
+  
+  // 关闭版本历史面板
+  showVersionHistory.value = false
+  
+  showSuccess('版本已恢复')
 }
 
 // 获取上下文窗口内容
@@ -566,145 +634,339 @@ const getContextWindow = (editor) => {
   }
 }
 
+// 获取增强的上下文窗口内容 - 更智能的上下文提取
+const getEnhancedContextWindow = (editor, cursorPosition) => {
+  if (!editor) return { before: '', after: '' }
+  
+  const { state } = editor
+  const text = state.doc.toString()
+  
+  // 设置上下文窗口大小（字符数）
+  const beforeWindowSize = 1500  // 前文1500字符
+  const afterWindowSize = 300    // 后文300字符
+  
+  // 计算前文开始位置
+  const beforeStart = Math.max(0, cursorPosition - beforeWindowSize)
+  let beforeText = text.substring(beforeStart, cursorPosition)
+  
+  // 如果前文被截断，尽量从完整的句子开始
+  if (beforeStart > 0) {
+    const sentenceStart = beforeText.search(/[。！？\n]\s*/)
+    if (sentenceStart !== -1) {
+      beforeText = beforeText.substring(sentenceStart + 1)
+    }
+  }
+  
+  // 计算后文结束位置
+  const afterEnd = Math.min(text.length, cursorPosition + afterWindowSize)
+  let afterText = text.substring(cursorPosition, afterEnd)
+  
+  // 如果后文被截断，尽量在完整的句子结束
+  if (afterEnd < text.length) {
+    const sentenceEnd = afterText.search(/[。！？\n]/)
+    if (sentenceEnd !== -1) {
+      afterText = afterText.substring(0, sentenceEnd + 1)
+    }
+  }
+  
+  return {
+    before: beforeText.trim(),
+    after: afterText.trim()
+  }
+}
+
 // AI辅助功能处理方法
-const handleAutoComplete = () => {
+const handleAutoComplete = async () => {
   const editor = textEditorRef.value.editor
   if (!editor) return
+  
+  // 检查AI连接状态
+  if (!isConnected.value) {
+    showError('AI服务未连接，无法使用自动完成功能')
+    return
+  }
   
   // 获取当前编辑器内容和光标位置
   const currentText = editor.getText()
   const { from } = editor.state.selection
   
-  // 获取上下文窗口
-  const { before, after } = getContextWindow(editor)
-  
-  // 请求文本补全，传递光标位置
-  completion.requestCompletion(currentText, before, after, from)
-}
-
-const handleRewrite = () => {
-  const editor = textEditorRef.value.editor
-  if (!editor) return
-  
-  // 获取选中的文本
-  const { from, to } = editor.state.selection
-  if (from === to) {
-    showError('请先选择要改写的文本')
+  // 检查是否有足够的文本内容
+  if (!currentText.trim() || currentText.trim().length < 10) {
+    showError('请输入更多文本内容以使用智能续写功能')
     return
   }
   
-  const selectedText = editor.state.doc.textBetween(from, to)
+  // 设置loading状态
+  isAiProcessing.value = true
+  aiProcessingType.value = 'auto-complete'
   
-  // 使用WebSocket发送改写请求
-  if (completion.isConnected) {
-    completion.send({
-      text: selectedText,
-      action: 'rewrite'
-    })
+  try {
+    // 获取上下文窗口 - 改进版本，获取更智能的上下文
+    const contextWindow = getEnhancedContextWindow(editor, from)
+    const { before, after } = contextWindow
     
-    // 监听改写结果
-    const handleRewriteResult = (data) => {
-      if (data.type === 'end' && data.action === 'rewrite') {
-        editor.chain().focus().deleteSelection().insertContent(data.completion).run()
-        completion.off('completion', handleRewriteResult)
-      }
-    }
+    // 显示加载状态
+    editorStore.updateAiStatus('智能续写中...')
     
-    completion.on('completion', handleRewriteResult)
-  } else {
-    // 如果WebSocket未连接，使用HTTP API
-    editorStore.optimizeText(selectedText, 'rewrite')
-      .then(optimizedText => {
-        editor.chain().focus().deleteSelection().insertContent(optimizedText).run()
-      })
-      .catch(error => {
-        console.error('改写失败:', error)
-        showError('改写失败，请重试')
-      })
+    // 请求文本补全，传递更详细的上下文信息
+    completion.requestCompletion(currentText, before, after, from)
+  } catch (error) {
+    console.error('智能续写失败:', error)
+    showError('智能续写失败，请重试')
+  } finally {
+    // 清除loading状态
+    isAiProcessing.value = false
+    aiProcessingType.value = ''
   }
 }
 
-const handleExpand = () => {
+const handleSimplify = async () => {
   const editor = textEditorRef.value.editor
   if (!editor) return
   
-  // 获取选中的文本
+  // 检查是否有选中文本
   const { from, to } = editor.state.selection
-  if (from === to) {
-    showError('请先选择要扩写的文本')
-    return
-  }
-  
-  const selectedText = editor.state.doc.textBetween(from, to)
-  
-  // 使用WebSocket发送扩写请求
-  if (completion.isConnected) {
-    completion.send({
-      text: selectedText,
-      action: 'expand'
-    })
-    
-    // 监听扩写结果
-    const handleExpandResult = (data) => {
-      if (data.type === 'end' && data.action === 'expand') {
-        editor.chain().focus().deleteSelection().insertContent(data.completion).run()
-        completion.off('completion', handleExpandResult)
-      }
-    }
-    
-    completion.on('completion', handleExpandResult)
-  } else {
-    // 如果WebSocket未连接，使用HTTP API
-    editorStore.optimizeText(selectedText, 'expand')
-      .then(optimizedText => {
-        editor.chain().focus().deleteSelection().insertContent(optimizedText).run()
-      })
-      .catch(error => {
-        console.error('扩写失败:', error)
-        showError('扩写失败，请重试')
-      })
-  }
-}
-
-const handleSimplify = () => {
-  const editor = textEditorRef.value.editor
-  if (!editor) return
-  
-  // 获取选中的文本
-  const { from, to } = editor.state.selection
-  if (from === to) {
+  if (from === to || !selectedText.value.trim()) {
     showError('请先选择要简化的文本')
     return
   }
   
-  const selectedText = editor.state.doc.textBetween(from, to)
+  // 检查AI连接状态
+  if (!isConnected.value) {
+    showError('AI服务未连接，无法使用简化功能')
+    return
+  }
   
-  // 使用WebSocket发送简化请求
-  if (completion.isConnected) {
-    completion.send({
-      text: selectedText,
-      action: 'simplify'
+  // 设置loading状态
+  isAiProcessing.value = true
+  aiProcessingType.value = 'simplify'
+  
+  try {
+    // 调用后端API进行文本简化
+    const response = await fetch('/api/v1/completion/optimize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: selectedText.value,
+        action: 'simplify',
+        context_before: editor.state.doc.textBetween(0, from),
+        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+      })
     })
     
-    // 监听简化结果
-    const handleSimplifyResult = (data) => {
-      if (data.type === 'end' && data.action === 'simplify') {
-        editor.chain().focus().deleteSelection().insertContent(data.completion).run()
-        completion.off('completion', handleSimplifyResult)
-      }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
     
-    completion.on('completion', handleSimplifyResult)
-  } else {
-    // 如果WebSocket未连接，使用HTTP API
-    editorStore.optimizeText(selectedText, 'simplify')
-      .then(optimizedText => {
-        editor.chain().focus().deleteSelection().insertContent(optimizedText).run()
+    const data = await response.json()
+    
+    if (data.completion) {
+      // 替换选中的文本
+      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
+      showSuccess('文本简化完成')
+    } else {
+      throw new Error('未收到简化结果')
+    }
+  } catch (error) {
+    console.error('简化失败:', error)
+    showError('简化失败，请重试')
+  } finally {
+    // 清除loading状态
+    isAiProcessing.value = false
+    aiProcessingType.value = ''
+  }
+}
+
+const handleRewrite = async () => {
+  const editor = textEditorRef.value.editor
+  if (!editor) return
+  
+  // 检查是否有选中文本
+  const { from, to } = editor.state.selection
+  if (from === to || !selectedText.value.trim()) {
+    showError('请先选择要改写的文本')
+    return
+  }
+  
+  // 检查AI连接状态
+  if (!isConnected.value) {
+    showError('AI服务未连接，无法使用改写功能')
+    return
+  }
+  
+  // 设置loading状态
+  isAiProcessing.value = true
+  aiProcessingType.value = 'rewrite'
+  
+  try {
+    // 调用后端API进行文本改写
+    const response = await fetch('/api/v1/completion/optimize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: selectedText.value,
+        action: 'rewrite',
+        context_before: editor.state.doc.textBetween(0, from),
+        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
       })
-      .catch(error => {
-        console.error('简化失败:', error)
-        showError('简化失败，请重试')
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    if (data.completion) {
+      // 替换选中的文本
+      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
+      showSuccess('文本改写完成')
+    } else {
+      throw new Error('未收到改写结果')
+    }
+  } catch (error) {
+    console.error('改写失败:', error)
+    showError('改写失败，请重试')
+  } finally {
+    // 清除loading状态
+    isAiProcessing.value = false
+    aiProcessingType.value = ''
+  }
+}
+
+const handleExpand = async () => {
+  const editor = textEditorRef.value.editor
+  if (!editor) return
+  
+  // 检查是否有选中文本
+  const { from, to } = editor.state.selection
+  if (from === to || !selectedText.value.trim()) {
+    showError('请先选择要扩写的文本')
+    return
+  }
+  
+  // 检查AI连接状态
+  if (!isConnected.value) {
+    showError('AI服务未连接，无法使用扩写功能')
+    return
+  }
+  
+  // 设置loading状态
+  isAiProcessing.value = true
+  aiProcessingType.value = 'expand'
+  
+  try {
+    // 调用后端API进行文本扩写
+    const response = await fetch('/api/v1/completion/optimize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: selectedText.value,
+        action: 'expand',
+        context_before: editor.state.doc.textBetween(0, from),
+        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
       })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    if (data.completion) {
+      // 替换选中的文本
+      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
+      showSuccess('文本扩写完成')
+    } else {
+      throw new Error('未收到扩写结果')
+    }
+  } catch (error) {
+    console.error('扩写失败:', error)
+    showError('扩写失败，请重试')
+  } finally {
+    // 清除loading状态
+    isAiProcessing.value = false
+    aiProcessingType.value = ''
+  }
+}
+
+const handleTranslate = async () => {
+  const editor = textEditorRef.value.editor
+  if (!editor) return
+  
+  // 调试信息
+  console.log('=== 翻译功能被调用 ===')
+  console.log('Selected text:', selectedText.value)
+  
+  // 检查是否有选中文本
+  const { from, to } = editor.state.selection
+  if (from === to || !selectedText.value.trim()) {
+    showError('请先选择要翻译的文本')
+    return
+  }
+  
+  // 检查AI连接状态
+  if (!isConnected.value) {
+    showError('AI服务未连接，无法使用翻译功能')
+    return
+  }
+  
+  // 设置loading状态
+  isAiProcessing.value = true
+  aiProcessingType.value = 'translate'
+  
+  try {
+    // 调用后端API进行文本翻译
+    console.log('=== 发送翻译请求到后端 ===')
+    console.log('Request body:', {
+      text: selectedText.value,
+      action: 'translate',
+      context_before: editor.state.doc.textBetween(0, from),
+      context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+    })
+    
+    const response = await fetch('/api/v1/completion/optimize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: selectedText.value,
+        action: 'translate',
+        context_before: editor.state.doc.textBetween(0, from),
+        context_after: editor.state.doc.textBetween(to, editor.state.doc.content.size)
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('=== 收到翻译响应 ===')
+    console.log('Response data:', data)
+    
+    if (data.completion) {
+      // 替换选中的文本
+      editor.chain().focus().deleteSelection().insertContent(data.completion).run()
+      showSuccess('文本翻译完成')
+    } else {
+      throw new Error('未收到翻译结果')
+    }
+  } catch (error) {
+    console.error('翻译失败:', error)
+    showError('翻译失败，请重试')
+  } finally {
+    // 清除loading状态
+    isAiProcessing.value = false
+    aiProcessingType.value = ''
   }
 }
 
@@ -747,6 +1009,137 @@ const deleteOutlineItem = (index) => {
   showSuccess('条目已删除')
 }
 
+/**
+ * 根据主题生成大纲 - 改进版
+ */
+const generateOutlineFromTopic = async () => {
+  if (!outlineTopicInput.value.trim()) {
+    showError('请输入文章主题')
+    return
+  }
+  
+  if (isGeneratingOutline.value) {
+    return // 防止重复请求
+  }
+  
+  try {
+    // 开始loading状态
+    isGeneratingOutline.value = true
+    
+    // 准备请求数据
+    const requestData = {
+      topic: outlineTopicInput.value.trim(),
+      paper_type: selectedDocumentType.value || 'essay',
+      discipline: 'general'  // 可以根据用户选择调整
+    }
+    
+    console.log('发送大纲生成请求:', requestData)
+    
+    // 调用后端API生成大纲
+    const response = await fetch('/api/v1/academic/outline', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData)
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('收到大纲数据:', data)
+    
+    // 验证返回的数据格式
+    if (!data.outline || !Array.isArray(data.outline)) {
+      throw new Error('返回的大纲数据格式不正确')
+    }
+    
+    // 转换API响应为前端格式
+    outline.value = data.outline.map((item, index) => ({
+      title: item.title || `章节 ${index + 1}`,
+      level: item.level || 1,
+      description: item.description || '',
+      expanded: true
+    }))
+    
+    // 关闭生成对话框
+    showOutlineGenerator.value = false
+    showSuccess('大纲生成完成！正在应用到文档...')
+    
+    // 延迟一下再应用大纲到文档，给用户时间看到成功信息
+    setTimeout(() => {
+      applyOutlineToDocument()
+    }, 500)
+    
+  } catch (error) {
+    console.error('生成大纲失败:', error)
+    showError(`生成大纲失败: ${error.message}`)
+  } finally {
+    // 结束loading状态
+    isGeneratingOutline.value = false
+  }
+}
+
+/**
+ * 跳过大纲生成
+ */
+const skipOutlineGeneration = () => {
+  showOutlineGenerator.value = false
+  showSuccess('已跳过大纲生成，可随时在侧边栏重新生成')
+}
+
+/**
+ * 处理工具条AI操作
+ */
+const handleToolbarAiAction = (action) => {
+  switch (action) {
+    case 'auto-complete':
+      handleAutoComplete()
+      break
+    case 'rewrite':
+      handleRewrite()
+      break
+    case 'expand':
+      handleExpand()
+      break
+    case 'simplify':
+      handleSimplify()
+      break
+    default:
+      console.warn('未知的AI操作:', action)
+  }
+}
+
+/**
+ * 处理工具条参考文献操作
+ */
+const handleToolbarReferenceAction = (action) => {
+  switch (action) {
+    case 'add':
+      // 显示添加引用提示
+      showSuccess('请添加引用信息')
+      break
+    case 'insert':
+      // 插入已有的引用
+      if (references.value.length === 0) {
+        showError('暂无可插入的引用，请先添加引用')
+        return
+      }
+      // 插入第一个引用作为示例，实际应该让用户选择
+      insertCitation(references.value[0])
+      break
+    case 'format':
+      // 格式化所有引用
+      showSuccess('引用格式已更新')
+      break
+    default:
+      console.warn('未知的参考文献操作:', action)
+  }
+}
+
 const generateOutlineFromDocument = () => {
   const editor = textEditorRef.value.editor
   if (!editor) return
@@ -774,21 +1167,115 @@ const generateOutlineFromDocument = () => {
   }, 1000)
 }
 
+// 处理文本选择变化
+const handleSelectionChange = (selection) => {
+  selectedText.value = selection.text
+  currentSelection.value = { from: selection.from, to: selection.to }
+}
+
+// 显示浮动工具条
+const showFloatingToolbar = (data) => {
+  showFloatingMenu.value = true
+  floatingMenuPosition.value = data.position
+  selectedText.value = data.selectedText
+  currentSelection.value = data.selectionRange
+}
+
+// 隐藏浮动工具条
+const hideFloatingToolbar = () => {
+  showFloatingMenu.value = false
+  selectedText.value = ''
+}
+
+// 处理浮动工具条操作
+const handleFloatingAction = (action) => {
+  const editor = textEditorRef.value?.editor
+  if (!editor || !selectedText.value) return
+  
+  switch (action) {
+    case 'auto-complete':
+      handleAutoComplete()
+      break
+    case 'rewrite':
+      handleRewrite()
+      break
+    case 'expand':
+      handleExpand()
+      break
+    case 'simplify':
+      handleSimplify()
+      break
+    case 'translate':
+      handleTranslate()
+      break
+    case 'insert-reference':
+      if (references.value.length > 0) {
+        insertCitation(references.value[0])
+      } else {
+        showError('暂无可插入的引用，请先添加引用')
+      }
+      break
+    default:
+      console.warn('未知的浮动工具条操作:', action)
+  }
+  
+  // 隐藏浮动工具条
+  hideFloatingToolbar()
+}
+
+// 从选中文本生成大纲
+const generateOutlineFromText = (text) => {
+  // 这里可以调用后端API来生成大纲
+  console.log('正在从选中文本生成大纲:', text)
+  showSuccess('正在生成大纲...')
+}
+
 const applyOutlineToDocument = () => {
-  const editor = textEditorRef.value.editor
-  if (!editor) return
+  const editor = textEditorRef.value?.editor
+  if (!editor || outline.value.length === 0) return
   
-  // 生成大纲HTML
-  let outlineHtml = ''
-  
-  outline.value.forEach(item => {
-    const tagName = `h${item.level}`
-    outlineHtml += `<${tagName}>${item.title}</${tagName}>\n<p>在此处添加内容...</p>\n`
-  })
-  
-  // 插入到编辑器
-  editor.commands.setContent(outlineHtml)
-  showSuccess('已应用大纲到文档')
+  try {
+    // 生成结构化的大纲HTML
+    let outlineHtml = ''
+    
+    outline.value.forEach(item => {
+      const level = Math.min(Math.max(item.level, 1), 6) // 确保level在1-6之间
+      const tagName = `h${level}`
+      
+      // 添加标题
+      outlineHtml += `<${tagName}>${item.title}</${tagName}>`
+      
+      // 如果有描述，添加描述段落
+      if (item.description && item.description.trim()) {
+        outlineHtml += `<p style="color: #666; font-style: italic; margin-bottom: 10px;">${item.description}</p>`
+      }
+      
+      // 为每个章节添加内容占位符
+      if (level <= 2) {
+        outlineHtml += `<p>请在此处展开"${item.title}"的具体内容...</p>`
+      }
+      
+      // 添加适当的空行
+      outlineHtml += `<p><br></p>`
+    })
+    
+    // 如果没有生成任何HTML，创建默认内容
+    if (!outlineHtml.trim()) {
+      outlineHtml = '<h1>欢迎使用墨井智能写作助手</h1><p>请开始您的写作之旅...</p>'
+    }
+    
+    // 设置编辑器内容
+    editor.commands.setContent(outlineHtml)
+    
+    // 更新内容状态
+    editorContent.value = outlineHtml
+    
+    showSuccess('大纲已成功应用到文档，您可以开始基于大纲进行写作了！')
+    
+  } catch (error) {
+    console.error('应用大纲到文档失败:', error)
+    showError('应用大纲到文档失败，请重试')
+  }
 }
 
 // 参考文献功能方法
@@ -860,79 +1347,44 @@ const insertCitation = (reference) => {
   showSuccess('引用已插入')
 }
 
-// 学术结构功能方法
-const generateStructure = () => {
+/**
+ * 生成学术结构
+ */
+const generateStructure = async () => {
   if (!academicTitle.value) {
     showError('请输入论文标题')
     return
   }
   
-  // 这里可以调用后端API来生成学术结构
-  // 模拟生成结构
-  setTimeout(() => {
-    // 假设这是从API返回的结构
-    structure.value = {
-      title: academicTitle.value,
-      abstract: '本研究旨在探讨...[摘要内容将根据研究问题生成]',
-      sections: [
-        {
-          title: '1. 引言',
-          description: '介绍研究背景、问题陈述和研究目的',
-          subsections: [
-            { title: '1.1 研究背景', description: '概述研究领域的当前状态和重要性' },
-            { title: '1.2 问题陈述', description: '明确定义待解决的研究问题' },
-            { title: '1.3 研究目的和目标', description: '阐述研究的具体目标和预期成果' }
-          ]
-        },
-        {
-          title: '2. 文献综述',
-          description: '回顾和评价相关研究文献',
-          subsections: [
-            { title: '2.1 理论框架', description: '讨论支持研究的理论基础' },
-            { title: '2.2 相关研究', description: '分析与研究问题相关的现有研究' },
-            { title: '2.3 研究差距', description: '确定现有研究中的不足之处' }
-          ]
-        },
-        {
-          title: '3. 研究方法',
-          description: '详细说明研究设计和方法',
-          subsections: [
-            { title: '3.1 研究设计', description: '描述研究的整体方法和设计' },
-            { title: '3.2 数据收集', description: '解释数据收集的方法和工具' },
-            { title: '3.3 数据分析', description: '详述数据分析的技术和程序' }
-          ]
-        },
-        {
-          title: '4. 结果',
-          description: '呈现研究发现',
-          subsections: [
-            { title: '4.1 主要发现', description: '展示与研究问题直接相关的结果' },
-            { title: '4.2 数据分析', description: '提供详细的数据分析和统计结果' }
-          ]
-        },
-        {
-          title: '5. 讨论',
-          description: '解释和评价研究结果',
-          subsections: [
-            { title: '5.1 结果解释', description: '解释研究发现的意义' },
-            { title: '5.2 与现有研究的比较', description: '将结果与现有文献进行比较' },
-            { title: '5.3 研究局限性', description: '讨论研究的局限性和不足' }
-          ]
-        },
-        {
-          title: '6. 结论',
-          description: '总结研究的主要发现和贡献',
-          subsections: [
-            { title: '6.1 研究总结', description: '概述研究的主要发现和结论' },
-            { title: '6.2 理论和实践意义', description: '讨论研究对理论和实践的贡献' },
-            { title: '6.3 未来研究方向', description: '提出未来研究的建议' }
-          ]
-        }
-      ]
+  try {
+    showSuccess('正在生成论文结构...')
+    
+    // 调用后端API生成学术结构
+    const response = await fetch('/api/v1/academic/structure', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: academicTitle.value,
+        paper_type: paperType.value || 'research',
+        discipline: discipline.value || 'science',
+        citation_style: citationStyle.value || 'apa'
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
     
-    showSuccess('已生成论文结构')
-  }, 1000)
+    const data = await response.json()
+    structure.value = data
+    
+    showSuccess('论文结构生成完成！')
+  } catch (error) {
+    console.error('生成论文结构失败:', error)
+    showError('生成论文结构失败，请重试')
+  }
 }
 
 const applyStructureToDocument = () => {
@@ -962,6 +1414,85 @@ const applyStructureToDocument = () => {
 }
 
 // 样式调整功能方法已移除
+
+/**
+ * 处理大纲生成事件
+ */
+const handleOutlineGenerate = (topic) => {
+  generateOutlineFromTopic(topic)
+}
+
+
+
+/**
+ * 处理格式化事件
+ */
+const handleFormat = (formatType) => {
+  const editor = textEditorRef.value?.editor
+  if (!editor) return
+  
+  switch (formatType) {
+    case 'heading1':
+      editor.chain().focus().toggleHeading({ level: 1 }).run()
+      break
+    case 'heading2':
+      editor.chain().focus().toggleHeading({ level: 2 }).run()
+      break
+    case 'heading3':
+      editor.chain().focus().toggleHeading({ level: 3 }).run()
+      break
+    case 'bold':
+      editor.chain().focus().toggleBold().run()
+      break
+    case 'italic':
+      editor.chain().focus().toggleItalic().run()
+      break
+    case 'underline':
+      editor.chain().focus().toggleUnderline().run()
+      break
+    case 'strike':
+      editor.chain().focus().toggleStrike().run()
+      break
+    case 'bulletList':
+      editor.chain().focus().toggleBulletList().run()
+      break
+    case 'orderedList':
+      editor.chain().focus().toggleOrderedList().run()
+      break
+    case 'blockquote':
+      editor.chain().focus().toggleBlockquote().run()
+      break
+    case 'codeBlock':
+      editor.chain().focus().toggleCodeBlock().run()
+      break
+    case 'alignLeft':
+      editor.chain().focus().setTextAlign('left').run()
+      break
+    case 'alignCenter':
+      editor.chain().focus().setTextAlign('center').run()
+      break
+    case 'alignRight':
+      editor.chain().focus().setTextAlign('right').run()
+      break
+    case 'horizontalRule':
+      editor.chain().focus().setHorizontalRule().run()
+      break
+    default:
+      console.warn('未知的格式化类型:', formatType)
+  }
+}
+
+/**
+ * 处理AI操作
+ */
+const handleAiAction = (action) => {
+  if (action.type === 'outline-generate') {
+    outlineTopicInput.value = action.topic
+    generateOutlineFromTopic()
+  } else {
+    console.warn('未知的AI操作:', action)
+  }
+}
 
 // 生命周期钩子
 onMounted(() => {

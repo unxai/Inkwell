@@ -21,6 +21,10 @@ class ConnectionManager:
         self.heartbeat_interval = heartbeat_interval
         self.connection_timeout = connection_timeout
         self.heartbeat_task = None
+        
+        # 添加错误计数器，防止无限错误循环
+        self.error_counts: Dict[str, int] = {}
+        self.max_errors_per_connection = 10  # 每个连接最多10个错误
     
     async def connect(self, websocket: WebSocket):
         """建立新的WebSocket连接"""
@@ -57,6 +61,8 @@ class ConnectionManager:
             if conn_info["websocket"] == websocket:
                 connection_id = conn_id
                 del self.active_connections[conn_id]
+                # 清理错误计数
+                self.error_counts.pop(conn_id, None)
                 break
         
         # 记录连接关闭
@@ -77,15 +83,52 @@ class ConnectionManager:
     async def send_json(self, websocket: WebSocket, data: Dict[str, Any]):
         """向指定的WebSocket连接发送JSON数据"""
         try:
+            # 检查连接是否仍然有效
+            if websocket.client_state.name != "CONNECTED":
+                # 如果连接已关闭，直接断开连接
+                self.disconnect(websocket)
+                return False
+            
+            # 查找连接ID用于错误计数
+            connection_id = None
+            for conn_id, conn_info in self.active_connections.items():
+                if conn_info["websocket"] == websocket:
+                    connection_id = conn_id
+                    break
+            
             await websocket.send_json(data)
             self.update_activity(websocket)
+            
+            # 发送成功，重置错误计数
+            if connection_id:
+                self.error_counts[connection_id] = 0
+            return True
         except Exception as e:
+            # 增加错误计数
+            if connection_id:
+                self.error_counts[connection_id] = self.error_counts.get(connection_id, 0) + 1
+                
+                # 如果错误次数过多，断开连接并停止发送
+                if self.error_counts[connection_id] >= self.max_errors_per_connection:
+                    logger.warning({
+                        "message": f"连接错误次数过多({self.error_counts[connection_id]})，主动断开连接",
+                        "connection_id": connection_id,
+                        "error": str(e)
+                    })
+                    self.disconnect(websocket)
+                    return False
+            
             logger.error({
                 "message": "发送WebSocket消息失败",
+                "connection_id": connection_id,
+                "error_count": self.error_counts.get(connection_id, 0),
                 "error": str(e)
             })
+            
             # 尝试断开连接
-            self.disconnect(websocket)
+            if connection_id and self.error_counts.get(connection_id, 0) >= 3:  # 3次错误后断开
+                self.disconnect(websocket)
+            return False
     
     async def broadcast_json(self, data: Dict[str, Any]):
         """向所有活跃的WebSocket连接广播JSON数据"""
@@ -105,11 +148,15 @@ class ConnectionManager:
     async def send_heartbeat(self, websocket: WebSocket):
         """发送心跳消息"""
         try:
+            # 检查连接是否仍然有效
+            if websocket.client_state.name != "CONNECTED":
+                return False
+                
             await websocket.send_json({"type": "heartbeat", "timestamp": time.time()})
             self.update_activity(websocket)
             return True
         except Exception as e:
-            logger.error({
+            logger.debug({
                 "message": "发送心跳消息失败",
                 "error": str(e)
             })
@@ -125,6 +172,16 @@ class ConnectionManager:
                 for conn_id, conn_info in list(self.active_connections.items()):
                     last_activity = conn_info["last_activity"]
                     websocket = conn_info["websocket"]
+                    
+                    # 检查连接状态
+                    if websocket.client_state.name != "CONNECTED":
+                        logger.info({
+                            "message": "WebSocket连接已关闭，清理连接",
+                            "connection_id": conn_id,
+                            "state": websocket.client_state.name
+                        })
+                        self.disconnect(websocket)
+                        continue
                     
                     # 检查是否超时
                     if current_time - last_activity > self.connection_timeout:

@@ -27,12 +27,22 @@ export function useCompletion(options = {}) {
 
   // 计算属性
   const isReady = computed(() => isConnected.value && !isGenerating.value)
+  const canReconnect = computed(() => {
+    const state = ws.getConnectionState()
+    return !state.isConnected && !state.isConnecting && !state.shouldReconnect
+  })
 
   // 连接WebSocket
   const connect = () => {
     ws.connect()
   }
 
+  // 手动重连
+  const reconnect = () => {
+    console.log('手动重连WebSocket')
+    ws.resetReconnect()
+    ws.connect()
+  }
   // 断开WebSocket连接
   const disconnect = () => {
     ws.disconnect()
@@ -114,14 +124,38 @@ export function useCompletion(options = {}) {
     status.value = '已连接'
   })
 
-  ws.on('close', () => {
+  ws.on('close', (event) => {
     isConnected.value = false
     status.value = '未连接'
+    
+    // 清理生成状态，避免loading状态卡住
+    if (isGenerating.value) {
+      isGenerating.value = false
+      currentCompletion.value = ''
+      completionBuffer.value = ''
+      
+      // 设置错误信息，通知用户连接中断
+      if (event && event.code === 1001) {
+        error.value = 'WebSocket连接异常关闭，请重试'
+      } else {
+        error.value = '连接已断开'
+      }
+      
+      console.warn('WebSocket连接关闭，清理生成状态', { code: event?.code, reason: event?.reason })
+    }
   })
 
   ws.on('error', (err) => {
-    error.value = '连接错误'
+    error.value = '连接错误: ' + (err?.message || err)
     status.value = '错误'
+    
+    // 清理生成状态
+    if (isGenerating.value) {
+      isGenerating.value = false
+      currentCompletion.value = ''
+      completionBuffer.value = ''
+      console.error('WebSocket错误，清理生成状态', err)
+    }
   })
 
   ws.on('completion', (data) => {
@@ -138,6 +172,13 @@ export function useCompletion(options = {}) {
       currentCompletion.value = data.completion || completionBuffer.value
       isGenerating.value = false
       status.value = '已完成'
+    } else if (data.type === 'error') {
+      // 处理错误消息
+      error.value = data.error || '处理请求时出错'
+      status.value = '错误'
+      isGenerating.value = false
+      currentCompletion.value = ''
+      completionBuffer.value = ''
     }
   })
 
@@ -148,6 +189,7 @@ export function useCompletion(options = {}) {
     isConnected,
     isGenerating,
     isReady,
+    canReconnect,
     status,
     error,
     currentCompletion,
@@ -155,6 +197,7 @@ export function useCompletion(options = {}) {
     contextWindowBefore,
     contextWindowAfter,
     connect,
+    reconnect,
     disconnect,
     send,
     requestCompletion,

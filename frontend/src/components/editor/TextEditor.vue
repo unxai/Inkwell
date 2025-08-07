@@ -1,7 +1,5 @@
 <template>
   <div class="text-editor h-full">
-    <!-- 编辑器工具栏 -->
-    <editor-toolbar :editor="editor" v-if="editor" />
     
     <!-- 编辑器内容区 -->
     <div class="editor-content-wrapper relative h-full w-full paper-effect" ref="editorContainer">
@@ -14,7 +12,28 @@
         :position="suggestionPosition"
         @accept="acceptSuggestion"
         @reject="rejectSuggestion"
+        @regenerate="regenerateSuggestion"
       />
+      
+      <!-- AI操作提示指示器 -->
+      <div 
+        v-if="showSuggestion || aiStatus === 'processing'" 
+        class="absolute bottom-4 right-4 bg-white bg-opacity-90 rounded-full shadow-md p-2 flex items-center space-x-2 text-sm text-gray-600 border border-gray-200"
+      >
+        <div v-if="aiStatus === 'processing'" class="flex items-center space-x-2">
+          <svg class="animate-spin h-4 w-4 text-[#4FD1C5]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>生成中...</span>
+        </div>
+        <div v-else-if="showSuggestion" class="flex items-center space-x-2">
+          <svg class="h-4 w-4 text-[#4FD1C5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          <span>Tab: 接受 | Esc: 拒绝</span>
+        </div>
+      </div>
       
       <!-- AI处理中指示器 -->
       <div 
@@ -29,59 +48,16 @@
       </div>
     </div>
     
-    <!-- 编辑器底部状态栏 -->
-    <div class="py-2 px-4 border-t border-gray-200 flex justify-between items-center text-sm text-gray-500 bg-gray-50">
-      <div class="flex items-center space-x-4">
-        <span class="flex items-center">
-          <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-          </svg>
-          {{ wordCount }} 字
-        </span>
-        <span class="hidden md:inline-flex items-center">
-          <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          {{ formatTime(editingTime) }}
-        </span>
-      </div>
-      <div class="flex items-center">
-        <span 
-          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-          :class="{
-            'bg-green-100 text-green-800': aiStatus === 'idle',
-            'bg-yellow-100 text-yellow-800': aiStatus === 'processing',
-            'bg-gray-100 text-gray-800': aiStatus !== 'idle' && aiStatus !== 'processing'
-          }"
-        >
-          <span 
-            class="w-2 h-2 mr-1.5 rounded-full"
-            :class="{
-              'bg-green-500': aiStatus === 'idle',
-              'bg-yellow-500': aiStatus === 'processing',
-              'bg-gray-500': aiStatus !== 'idle' && aiStatus !== 'processing'
-            }"
-          ></span>
-          {{ aiStatus === 'idle' ? 'AI 就绪' : aiStatus === 'processing' ? 'AI 处理中' : 'AI ' + aiStatus }}
-        </span>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Highlight from '@tiptap/extension-highlight'
 import { useEditorStore } from '@/store/modules/editor'
-import EditorToolbar from './EditorToolbar.vue'
 import CompletionSuggestion from './CompletionSuggestion.vue'
 
 const props = defineProps({
@@ -92,16 +68,38 @@ const props = defineProps({
   autoCompleteEnabled: {
     type: Boolean,
     default: true
+  },
+  isConnected: {
+    type: Boolean,
+    default: false
+  },
+  references: {
+    type: Array,
+    default: () => []
   }
 })
 
-const emit = defineEmits(['update:content', 'text-change', 'completion-accepted', 'completion-rejected'])
+const emit = defineEmits([
+  'update:content',
+  'text-change',
+  'completion-accepted',
+  'completion-rejected',
+  'selection-change',
+  'show-floating-toolbar',
+  'hide-floating-toolbar',
+  'request-completion'
+])
 
 // 使用编辑器状态管理
 const editorStore = useEditorStore()
 const wordCount = ref(0)
 const aiStatus = ref('idle')
-const editingTime = ref(0) // 编辑时间（秒）
+// 文本选择状态
+const selectedText = ref('')
+const selectionRange = ref({ from: 0, to: 0 })
+
+// 编辑时间
+const editingTime = ref(0)
 let editingTimer = null
 
 // 自动完成相关状态
@@ -111,9 +109,114 @@ const showSuggestion = ref(false)
 const suggestionPosition = ref({ top: 0, left: 0 })
 const currentCursorPosition = ref(0)
 const typingTimer = ref(null) // 用户输入定时器
+const showToolbarTimeout = ref(null) // 浮动工具条显示延迟定时器
 const typingDelay = 1000 // 用户停止输入后等待时间(毫秒)
 const lastCompletionTime = ref(0) // 上次请求补全的时间
 const completionCooldown = 3000 // 补全请求冷却时间(毫秒)
+
+// 监听文本选择变化
+const handleSelectionUpdate = ({ editor }) => {
+  const { state } = editor
+  const { selection } = state
+  const { from, to } = selection
+  
+  // 更新选择范围
+  selectionRange.value = { from, to }
+  
+  // 获取选中的文本
+  const text = state.doc.textBetween(from, to)
+  selectedText.value = text
+  
+  // 发送选择变化事件
+  emit('selection-change', {
+    text,
+    from,
+    to,
+    hasSelection: from !== to
+  })
+  
+  // 如果有选中文本，显示浮动工具条
+  if (text.trim() && from !== to && text.trim().length >= 2) { // 至少选择2个字符才显示
+    // 获取选择位置的坐标
+    try {
+      // 获取选择的开始和结束位置坐标
+      const startCoords = editor.view.coordsAtPos(from)
+      const endCoords = editor.view.coordsAtPos(to)
+      const containerRect = editorContainer.value?.getBoundingClientRect()
+      
+      if (containerRect) {
+        // 计算选择文本的中心位置
+        const selectionCenterX = (startCoords.left + endCoords.left) / 2
+        const selectionTop = startCoords.top
+        
+        // 工具条尺寸估算 - 减少估算宽度
+        const toolbarWidth = 350  // 调整为更精确的宽度
+        const toolbarHeight = 50
+        const margin = 10
+        
+        // 计算相对于编辑器容器的位置
+        let left = selectionCenterX - containerRect.left - (toolbarWidth / 2)
+        let top = selectionTop - containerRect.top - toolbarHeight - margin
+        
+        // 获取编辑器容器的实际宽度
+        const containerWidth = containerRect.width
+        
+        // 防止工具条超出左边界
+        if (left < margin) {
+          left = margin
+        }
+        // 防止工具条超出右边界
+        else if (left + toolbarWidth > containerWidth - margin) {
+          left = containerWidth - toolbarWidth - margin
+        }
+        
+        // 防止工具条超出上边界，如果上方空间不够，显示在选择文本下方
+        if (top < margin) {
+          // 获取选择区域底部位置
+          const selectionBottom = Math.max(startCoords.bottom, endCoords.bottom)
+          top = selectionBottom - containerRect.top + margin
+        }
+        
+        const position = { top, left }
+        
+        // 调试信息
+        console.log('浮动工具条位置计算:', {
+          selectionCenterX,
+          selectionTop,
+          containerRect,
+          toolbarWidth,
+          calculatedPosition: position,
+          selectedText: text
+        })
+        
+        // 延迟显示工具条，避免快速选择时的闪烁
+        clearTimeout(showToolbarTimeout)
+        showToolbarTimeout = setTimeout(() => {
+          emit('show-floating-toolbar', {
+            position,
+            selectedText: text,
+            selectionRange: { from, to }
+          })
+        }, 200) // 200ms 延迟
+      }
+    } catch (error) {
+      console.warn('无法计算浮动工具条位置:', error)
+    }
+  } else {
+    // 清除延迟显示的定时器
+    clearTimeout(showToolbarTimeout)
+    emit('hide-floating-toolbar')
+  }
+  
+  // 更新光标位置
+  currentCursorPosition.value = from
+  editorStore.updateCursorPosition(from)
+  
+  // 如果有建议显示，更新建议位置
+  if (showSuggestion.value) {
+    updateSuggestionPosition()
+  }
+}
 
 // 格式化时间
 const formatTime = (seconds) => {
@@ -180,18 +283,7 @@ const editor = useEditor({
       }, typingDelay)
     }
   },
-  onSelectionUpdate: ({ editor }) => {
-    // 更新光标位置
-    if (editor.state.selection) {
-      currentCursorPosition.value = editor.state.selection.from
-      editorStore.updateCursorPosition(currentCursorPosition.value)
-      
-      // 如果有建议显示，更新建议位置
-      if (showSuggestion.value) {
-        updateSuggestionPosition()
-      }
-    }
-  },
+  onSelectionUpdate: handleSelectionUpdate,
   onFocus: () => {
     // 编辑器获得焦点时，开始计时
     if (!editingTimer) {
@@ -206,6 +298,10 @@ const editor = useEditor({
       clearInterval(editingTimer)
       editingTimer = null
     }
+    // 延迟隐藏浮动工具条，给用户时间点击工具条
+    setTimeout(() => {
+      emit('hide-floating-toolbar')
+    }, 150)
   }
 })
 
@@ -227,26 +323,126 @@ watch(() => editorStore.completionText, (newCompletion) => {
   }
 })
 
-// 更新建议位置
+// 在 TextEditor.vue 中添加以下优化
+
+// 更新建议位置计算函数
 const updateSuggestionPosition = () => {
   if (!editor.value || !editorContainer.value) return
   
   const { state, view } = editor.value
   const { from } = state.selection
   
-  // 获取光标位置的坐标
-  const coords = view.coordsAtPos(from)
-  
-  // 计算相对于编辑器容器的位置
-  const containerRect = editorContainer.value.getBoundingClientRect()
-  
-  suggestionPosition.value = {
-    top: coords.top - containerRect.top,
-    left: coords.left - containerRect.left
+  try {
+    // 获取光标位置的坐标
+    const coords = view.coordsAtPos(from)
+    
+    // 计算相对于编辑器容器的位置
+    const containerRect = editorContainer.value.getBoundingClientRect()
+    
+    suggestionPosition.value = {
+      top: coords.top - containerRect.top + window.scrollY,
+      left: coords.left - containerRect.left + window.scrollX
+    }
+  } catch (error) {
+    console.warn('无法计算建议位置:', error)
+    // 使用默认位置
+    suggestionPosition.value = { top: 100, left: 100 }
   }
 }
 
-// 接受建议
+// 添加重新生成建议的方法
+const regenerateSuggestion = () => {
+  if (!editor.value) return
+  
+  // 清除当前建议
+  showSuggestion.value = false
+  completionSuggestion.value = ''
+  
+  // 重新触发自动完成
+  setTimeout(() => {
+    triggerAutoCompletion()
+  }, 100)
+}
+
+// 优化触发自动完成的逻辑
+const triggerAutoCompletion = () => {
+  if (!editor.value || aiStatus.value === 'processing') return
+  
+  const now = Date.now()
+  // 检查是否在冷却期内
+  if (now - lastCompletionTime.value < completionCooldown) {
+    return
+  }
+  
+  const { state } = editor.value
+  const { from } = state.selection
+  const text = editor.value.getText()
+  
+  // 获取光标前后的上下文
+  const contextBefore = text.slice(0, from)
+  const contextAfter = text.slice(from)
+  
+  // 改进触发条件 - 添加更严格的检查
+  if (!contextBefore.trim() || contextBefore.length < 10) return
+  
+  // 检查是否在句子中间（避免在单词中间触发）
+  const lastChar = contextBefore.slice(-1)
+  const isAtWordEnd = /[\s\.,;:!?。，；：！？]/.test(lastChar)
+  
+  if (!isAtWordEnd && contextBefore.length > 20) {
+    // 如果不在单词结尾，检查是否有足够的上下文
+    const words = contextBefore.trim().split(/\s+/)
+    if (words.length < 5) return
+  }
+  
+  // 检查编辑器是否仍然处于活动状态
+  if (!editor.value.isFocused) {
+    return
+  }
+  
+  // 检查当前是否有选中的文本，如果有则不触发自动完成
+  if (from !== state.selection.to) {
+    return
+  }
+  
+  // 更新上次请求时间
+  lastCompletionTime.value = now
+  
+  // 设置AI状态为处理中
+  editorStore.updateAiStatus('processing')
+  
+  // 请求补全
+  emit('request-completion', {
+    text: contextBefore,
+    contextBefore,
+    contextAfter,
+    cursorPosition: from
+  })
+}
+
+// 更新键盘事件处理
+const handleKeyDown = (event) => {
+  // 如果有建议显示
+  if (showSuggestion.value && completionSuggestion.value) {
+    // Tab键接受建议
+    if (event.key === 'Tab') {
+      event.preventDefault()
+      acceptSuggestion(completionSuggestion.value)
+    }
+    // Esc键拒绝建议
+    else if (event.key === 'Escape') {
+      event.preventDefault()
+      rejectSuggestion()
+    }
+    // Ctrl+R 重新生成
+    else if (event.ctrlKey && event.key === 'r') {
+      event.preventDefault()
+      regenerateSuggestion()
+    }
+  }
+}
+
+// 在模板中更新 CompletionSuggestion 组件
 const acceptSuggestion = (suggestion) => {
   if (!editor.value || !suggestion) return
   
@@ -270,53 +466,6 @@ const rejectSuggestion = () => {
   emit('completion-rejected')
 }
 
-// 触发自动完成
-const triggerAutoCompletion = () => {
-  if (!editor.value || aiStatus.value === 'processing') return
-  
-  const now = Date.now()
-  // 检查是否在冷却期内
-  if (now - lastCompletionTime.value < completionCooldown) {
-    return
-  }
-  
-  const { state } = editor.value
-  const { from } = state.selection
-  const text = editor.value.getText()
-  
-  // 获取光标前后的上下文
-  const contextBefore = text.slice(0, from)
-  const contextAfter = text.slice(from)
-  
-  // 如果上下文为空，不触发补全
-  if (!contextBefore.trim()) return
-  
-  // 更新上次请求时间
-  lastCompletionTime.value = now
-  
-  // 设置AI状态为处理中
-  editorStore.updateAiStatus('processing')
-  
-  // 请求补全
-  editorStore.getCompletion(contextBefore, contextBefore, contextAfter, from)
-}
-
-// 处理键盘事件
-const handleKeyDown = (event) => {
-  // 如果有建议显示
-  if (showSuggestion.value && completionSuggestion.value) {
-    // Tab键接受建议
-    if (event.key === 'Tab') {
-      event.preventDefault()
-      acceptSuggestion(completionSuggestion.value)
-    }
-    // Esc键拒绝建议
-    else if (event.key === 'Escape') {
-      event.preventDefault()
-      rejectSuggestion()
-    }
-  }
-}
 
 // 生命周期钩子
 onMounted(() => {
@@ -344,6 +493,12 @@ onBeforeUnmount(() => {
     typingTimer.value = null
   }
   
+  // 清除浮动工具条显示定时器
+  if (showToolbarTimeout.value) {
+    clearTimeout(showToolbarTimeout.value)
+    showToolbarTimeout.value = null
+  }
+  
   // 销毁编辑器
   if (editor.value) {
     editor.value.destroy()
@@ -355,7 +510,9 @@ defineExpose({
   editor,
   acceptSuggestion,
   rejectSuggestion,
-  currentCursorPosition
+  currentCursorPosition,
+  selectedText,
+  selectionRange
 })
 </script>
 

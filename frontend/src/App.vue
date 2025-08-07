@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-screen bg-white text-gray-900 flex flex-col">
-    <!-- 使用 Vue3 Toastify 替代原有的错误和成功提示组件 -->
-    
+
     <main class="flex-grow">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">

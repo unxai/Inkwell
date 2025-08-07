@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+from app.services.openai_service import OpenAIService
 
 router = APIRouter()
 
@@ -26,15 +27,92 @@ class StructureResponse(BaseModel):
     sections: List[SectionModel]
     citationGuide: Optional[str] = None
 
+class OutlineRequest(BaseModel):
+    """大纲生成请求模型"""
+    topic: str
+    paper_type: str = "research"  # research, review, case-study, thesis
+    discipline: str = "science"   # science, social, humanities, engineering, medicine, business
+
+class OutlineItem(BaseModel):
+    """大纲条目模型"""
+    title: str
+    level: int = 1
+    description: Optional[str] = None
+
+class OutlineResponse(BaseModel):
+    """大纲生成响应模型"""
+    topic: str
+    outline: List[OutlineItem]
+
 @router.post("/structure", response_model=StructureResponse)
 async def generate_structure(request: StructureRequest):
     """
     生成学术论文结构
     """
     try:
-        # 由于OpenAIService.generate_academic_structure方法已被移除
-        # 这里返回一个基本的结构模板
+        # 构建提示词
+        prompt = f"""
+请为以下学术论文生成详细的结构：
+
+标题：{request.title}
+论文类型：{request.paper_type}
+学科领域：{request.discipline}
+引用格式：{request.citation_style}
+研究问题：{request.research_question or '未指定'}
+关键词：{request.keywords or '未指定'}
+
+要求：
+1. 生成适合该学科和论文类型的完整结构
+2. 包含标题、摘要和详细的章节安排
+3. 每个章节要有描述和子章节
+4. 提供引用格式指南
+5. 结构要符合学术写作规范
+
+请按以下JSON格式返回：
+{{
+  "title": "论文标题",
+  "abstract": "摘要内容",
+  "sections": [
+    {{
+      "title": "章节标题",
+      "description": "章节描述",
+      "subsections": [
+        {{"title": "子章节标题", "description": "子章节描述"}}
+      ]
+    }}
+  ],
+  "citationGuide": "引用格式指南"
+}}
+"""
         
+        # 调用OpenAI服务生成结构
+        messages = [
+            {"role": "system", "content": "你是一个专业的学术写作助手，擅长生成符合学术规范的论文结构。请严格按照JSON格式返回结果。"},
+            {"role": "user", "content": prompt}
+        ]
+        
+        # 使用非流式调用获取完整响应
+        response = await OpenAIService._call_openai_api(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=2000,
+            temperature=0.7,
+            stream=False
+        )
+        
+        # 解析响应
+        content = response.choices[0].message.content.strip()
+        
+        # 尝试解析JSON响应
+        import json
+        try:
+            structure_data = json.loads(content)
+            return StructureResponse(**structure_data)
+        except (json.JSONDecodeError, ValueError):
+            # 如果JSON解析失败，返回默认结构
+            pass
+        
+        # 默认结构模板（作为后备方案）
         if request.paper_type == "research":
             structure = {
                 "title": request.title,
@@ -197,3 +275,112 @@ async def generate_structure(request: StructureRequest):
         return structure
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成论文结构失败: {str(e)}")
+
+@router.post("/outline", response_model=OutlineResponse)
+async def generate_outline(request: OutlineRequest):
+    """
+    根据主题生成文章大纲
+    """
+    try:
+        # 根据不同类型构建不同的提示词
+        type_descriptions = {
+            "essay": "论述文章",
+            "research": "研究论文", 
+            "business": "商业文档",
+            "creative": "创意写作",
+            "technical": "技术文档"
+        }
+        
+        discipline_contexts = {
+            "science": "科学研究",
+            "social": "社会科学", 
+            "humanities": "人文学科",
+            "engineering": "工程技术",
+            "medicine": "医学",
+            "business": "商业管理"
+        }
+        
+        doc_type = type_descriptions.get(request.paper_type, "学术文章")
+        discipline_context = discipline_contexts.get(request.discipline, "学术")
+        
+        prompt = f"""
+请为以下主题生成一个详细的{doc_type}大纲：
+
+主题：{request.topic}
+类型：{doc_type}
+领域：{discipline_context}
+
+要求：
+1. 生成5-8个主要章节，每个章节包含2-4个子章节
+2. 章节标题要具体、有逻辑性，并能充分展开主题
+3. 适合{discipline_context}领域的写作风格和结构
+4. 确保内容层次分明，逻辑连贯
+5. 包含引言、正文展开和结论部分
+
+请按以下JSON格式返回：
+{{
+  "topic": "{request.topic}",
+  "outline": [
+    {{"title": "引言", "level": 1, "description": "简要描述"}},
+    {{"title": "主题背景", "level": 2, "description": "详细说明"}},
+    {{"title": "核心论述", "level": 1, "description": "简要描述"}},
+    {{"title": "具体观点一", "level": 2, "description": "详细说明"}},
+    {{"title": "具体观点二", "level": 2, "description": "详细说明"}},
+    {{"title": "结论与展望", "level": 1, "description": "简要描述"}}
+  ]
+}}
+"""
+        
+        # 调用OpenAI服务生成大纲
+        messages = [
+            {"role": "system", "content": "你是一个专业的写作助手，擅长生成结构化的文章大纲。请严格按照JSON格式返回结果，确保内容专业、逻辑清晰。"},
+            {"role": "user", "content": prompt}
+        ]
+        
+        # 使用更好的模型和参数
+        response = await OpenAIService._call_openai_api(
+            model="gpt-4" if hasattr(OpenAIService, '_use_gpt4') else "gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=1500,
+            temperature=0.6,  # 降低温度以提高一致性
+            stream=False
+        )
+        
+        # 解析响应
+        content = response.choices[0].message.content.strip()
+        
+        # 尝试解析JSON响应
+        import json
+        try:
+            outline_data = json.loads(content)
+            outline_items = outline_data.get("outline", [])
+        except json.JSONDecodeError:
+            # 如果JSON解析失败，返回默认大纲
+            outline_items = [
+                {"title": f"{request.topic} - 引言", "level": 1},
+                {"title": "背景介绍", "level": 2},
+                {"title": "研究意义", "level": 2},
+                {"title": f"{request.topic} - 主要内容", "level": 1},
+                {"title": "核心观点一", "level": 2},
+                {"title": "核心观点二", "level": 2},
+                {"title": "核心观点三", "level": 2},
+                {"title": "总结与展望", "level": 1}
+            ]
+        
+        # 转换为OutlineItem对象
+        outline = [
+            OutlineItem(
+                title=item.get("title", ""),
+                level=item.get("level", 1),
+                description=item.get("description")
+            )
+            for item in outline_items
+        ]
+        
+        return OutlineResponse(
+            topic=request.topic,
+            outline=outline
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成大纲失败: {str(e)}")
